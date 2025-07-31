@@ -275,3 +275,10 @@ export const approveChore = (uuid: string): void => {
     chore.status = "unclaimed";
   }
 };
+
+export const completeChore = (uuid: string): void => {
+  const chore = CHORES.find((chore) => chore.uuid === uuid);
+  if (chore) {
+    chore.status = "complete";
+  }
+};

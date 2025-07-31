@@ -2,23 +2,26 @@ import { CenterModal } from "@/components/CenterModal";
 import { Checklist } from "@/components/Checklist";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import { ChecklistProvider, useChecklist } from "@/context/ChecklistContext";
 import { Chore, TodoItem, getChoreById } from "@/data/mock";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { StyleSheet } from "react-native";
+import { Alert, StyleSheet, TouchableOpacity, View } from "react-native";
 
-export default function ChoreView() {
+function ChoreViewContent() {
   const { uuid } = useLocalSearchParams();
   const [chore, setChore] = useState<Chore | null>(null);
   const [selectedItem, setSelectedItem] = useState<TodoItem | null>(null);
+  const { isAllCompleted, resetCompleted } = useChecklist();
 
   useEffect(() => {
     if (uuid) {
       const foundChore = getChoreById(uuid as string);
       setChore(foundChore ?? null);
+      resetCompleted();
     }
-  }, [uuid]);
+  }, [uuid, resetCompleted]);
 
   if (!chore) {
     return (
@@ -28,6 +31,7 @@ export default function ChoreView() {
     );
   }
 
+  const allTasksCompleted = isAllCompleted(chore.todos.length);
   const IconComponent = getLucideIcon(chore.icon);
 
   return (
@@ -35,7 +39,6 @@ export default function ChoreView() {
       <IconComponent size={64} color="#666" />
       <ThemedText style={styles.title}>{chore.name}</ThemedText>
       <Checklist items={chore.todos} onItemPress={setSelectedItem} />
-
       {selectedItem && (
         <CenterModal
           visible={!!selectedItem}
@@ -49,7 +52,24 @@ export default function ChoreView() {
           </ThemedView>
         </CenterModal>
       )}
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={[styles.button, !allTasksCompleted && styles.disabledButton]}
+          disabled={!allTasksCompleted}
+          onPress={() => Alert.alert("Chore validated!")}
+        >
+          <ThemedText style={styles.buttonText}>Validate Chore</ThemedText>
+        </TouchableOpacity>
+      </View>
     </ThemedView>
+  );
+}
+
+export default function ChoreView() {
+  return (
+    <ChecklistProvider>
+      <ChoreViewContent />
+    </ChecklistProvider>
   );
 }
 
@@ -74,5 +94,22 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     marginBottom: 10,
+  },
+  buttonContainer: {
+    width: "100%",
+    padding: 20,
+  },
+  button: {
+    backgroundColor: "#007BFF",
+    padding: 15,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  disabledButton: {
+    backgroundColor: "#A9A9A9",
+  },
+  buttonText: {
+    color: "white",
+    fontWeight: "bold",
   },
 });

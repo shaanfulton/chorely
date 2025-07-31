@@ -1,3 +1,4 @@
+import { useChecklist } from "@/context/ChecklistContext";
 import { TodoItem } from "@/data/mock";
 import React from "react";
 import {
@@ -14,18 +15,28 @@ interface ChecklistProps {
 }
 
 export function Checklist({ items, onItemPress }: ChecklistProps) {
+  const { completedItems, toggleItem } = useChecklist();
+
   return (
     <View style={styles.container}>
       <ScrollView>
         {items.map((item, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.itemContainer}
-            onPress={() => onItemPress(item)}
-          >
-            <View style={styles.checkbox} />
-            <Text style={styles.itemText}>{item.name}</Text>
-          </TouchableOpacity>
+          <View key={index} style={styles.itemContainer}>
+            <TouchableOpacity
+              style={[
+                styles.checkbox,
+                completedItems.has(item.name) && styles.checked,
+              ]}
+              onPress={() => toggleItem(item.name)}
+            >
+              {completedItems.has(item.name) && (
+                <Text style={styles.checkmark}>✓</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => onItemPress(item)}>
+              <Text style={styles.itemText}>{item.name}</Text>
+            </TouchableOpacity>
+          </View>
         ))}
       </ScrollView>
     </View>
@@ -51,6 +62,16 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#ccc",
     marginRight: 15,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  checked: {
+    backgroundColor: "#007BFF",
+    borderColor: "#007BFF",
+  },
+  checkmark: {
+    color: "white",
+    fontSize: 12,
   },
   itemText: {
     fontSize: 16,
