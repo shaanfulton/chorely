@@ -32,6 +32,18 @@ export default function RootLayout() {
               },
             }}
           />
+          <Stack.Screen
+            name="chore-view"
+            options={{
+              title: "",
+              headerBackTitle: "Back",
+              headerBackButtonDisplayMode: "minimal",
+              headerTitleStyle: {
+                fontSize: 20,
+                fontWeight: "600",
+              },
+            }}
+          />
           <Stack.Screen name="+not-found" />
         </Stack>
         <StatusBar style="dark" />

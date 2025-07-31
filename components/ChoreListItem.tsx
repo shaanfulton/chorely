@@ -1,29 +1,41 @@
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import { Chore } from "@/data/mock";
 import { getLucideIcon } from "@/utils/iconUtils";
+import { Link } from "expo-router";
 import React from "react";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 export function ChoreListItem({
   chore,
   children,
 }: {
-  chore: { name: string; time: string; icon: string };
+  chore: Chore;
   children?: React.ReactNode;
 }) {
   // Get the lucide icon component using utility function
   const IconComponent = getLucideIcon(chore.icon);
   return (
-    <ThemedView style={styles.container}>
-      <View style={styles.iconContainer}>
-        <IconComponent size={24} color="#666" />
-      </View>
-      <View style={styles.textContainer}>
-        <ThemedText type="defaultSemiBold">{chore.name}</ThemedText>
-        <ThemedText type="default">{chore.time}</ThemedText>
-      </View>
-      <View>{children}</View>
-    </ThemedView>
+    <Link
+      href={{
+        pathname: "/chore-view",
+        params: { uuid: chore.uuid },
+      }}
+      asChild
+    >
+      <Pressable>
+        <ThemedView style={styles.container}>
+          <View style={styles.iconContainer}>
+            <IconComponent size={24} color="#666" />
+          </View>
+          <View style={styles.textContainer}>
+            <ThemedText type="defaultSemiBold">{chore.name}</ThemedText>
+            <ThemedText type="default">{chore.time}</ThemedText>
+          </View>
+          <View>{children}</View>
+        </ThemedView>
+      </Pressable>
+    </Link>
   );
 }
 

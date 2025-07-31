@@ -2,6 +2,7 @@ import IconSelector from "@/components/IconSelector";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import UrgencySelector from "@/components/UrgencySelector";
+import { createChore } from "@/data/mock";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
@@ -38,11 +39,16 @@ export default function CreateChoreScreen() {
       return;
     }
 
-    // Here you would typically save the chore to your data store
-    // For now, we'll just show an alert and navigate back
+    createChore({
+      name: choreName,
+      description: choreDescription,
+      time: urgencyOptions[choreUrgency],
+      icon: choreIcon,
+    });
+
     Alert.alert(
       "Chore Created",
-      `"${choreName}" has been created successfully!`,
+      `"${choreName}" has been created successfully! It is now waiting for approval.`,
       [
         {
           text: "OK",
