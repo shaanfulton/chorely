@@ -6,7 +6,6 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 interface ChoreOption {
   name: string;
   icon: string;
-  defaultTime?: string;
   description?: string;
 }
 
@@ -44,11 +43,6 @@ export function PresetChoreOption({
       <View style={styles.iconContainer}>{renderIcon()}</View>
       <View style={styles.textContainer}>
         <ThemedText type="defaultSemiBold">{title}</ThemedText>
-        {!isCustom && chore?.defaultTime && (
-          <ThemedText type="default" style={styles.timeText}>
-            Estimated time: {chore.defaultTime}
-          </ThemedText>
-        )}
       </View>
     </TouchableOpacity>
   );
@@ -58,15 +52,11 @@ const styles = StyleSheet.create({
   choreOption: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 15,
-    borderRadius: 10,
-    marginVertical: 5,
-    backgroundColor: "#F5F5F5",
   },
   iconContainer: {
     width: 50,
     height: 50,
-    borderRadius: 25,
+    borderRadius: 5,
     backgroundColor: "#E0E0E0",
     marginRight: 15,
     justifyContent: "center",
@@ -80,7 +70,7 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: 2,
   },
-  timeText: {
+  urgencyText: {
     fontSize: 12,
     color: "#888",
     marginTop: 4,

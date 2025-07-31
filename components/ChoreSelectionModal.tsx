@@ -19,7 +19,6 @@ import Animated, {
 interface ChoreOption {
   name: string;
   icon: string;
-  defaultTime?: string;
   description?: string;
 }
 
@@ -33,25 +32,21 @@ const COMMON_CHORES: ChoreOption[] = [
   {
     name: "Trash",
     icon: "trash-2",
-    defaultTime: "15m",
     description: "Take out trash and recycling",
   },
   {
     name: "Sweeping",
     icon: "brush",
-    defaultTime: "30m",
     description: "Sweep floors throughout the house",
   },
   {
     name: "Dishes",
     icon: "droplets",
-    defaultTime: "25m",
     description: "Wash and dry dishes",
   },
   {
     name: "Vacuum",
     icon: "wind",
-    defaultTime: "45m",
     description: "Vacuum carpets and rugs",
   },
 ];
@@ -174,7 +169,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     position: "absolute",
-    height: MODAL_HEIGHT,
+    height: "auto",
     width: "90%",
     alignSelf: "center",
     backgroundColor: "white",
@@ -215,6 +210,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
     paddingBottom: 20,
+    gap: 20,
   },
   sectionTitle: {
     marginBottom: 15,

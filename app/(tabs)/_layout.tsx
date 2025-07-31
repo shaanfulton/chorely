@@ -2,10 +2,10 @@ import { Tabs, router } from "expo-router";
 import React, { useState } from "react";
 import { Platform } from "react-native";
 
+import { AnimatedCreateButton } from "@/components/AnimatedCreateButton";
 import { ChoreSelectionModal } from "@/components/ChoreSelectionModal";
 import TabBarBackground from "@/components/ui/TabBarBackground";
-import { Colors } from "@/constants/Colors";
-import { House, Plus } from "lucide-react-native";
+import { AlertTriangle, House } from "lucide-react-native";
 
 export default function TabLayout() {
   const [modalVisible, setModalVisible] = useState(false);
@@ -29,7 +29,7 @@ export default function TabLayout() {
     <>
       <Tabs
         screenOptions={{
-          tabBarActiveTintColor: Colors.light.tint,
+          tabBarActiveTintColor: "#010101",
           headerShown: false,
           tabBarBackground: TabBarBackground,
           tabBarStyle: Platform.select({
@@ -51,14 +51,29 @@ export default function TabLayout() {
         <Tabs.Screen
           name="create-chore-tab"
           options={{
-            title: "Create Chore",
-            tabBarIcon: ({ color }) => <Plus size={28} color={color} />,
+            title: modalVisible ? "" : "Create Chore",
+            tabBarIcon: ({ color }) => (
+              <AnimatedCreateButton
+                color={color}
+                modalVisible={modalVisible}
+                onPress={() => setModalVisible(!modalVisible)}
+              />
+            ),
           }}
           listeners={{
             tabPress: (e) => {
               e.preventDefault();
-              setModalVisible(true);
+              setModalVisible(!modalVisible);
             },
+          }}
+        />
+        <Tabs.Screen
+          name="dispute-chore"
+          options={{
+            title: "Dispute",
+            tabBarIcon: ({ color }) => (
+              <AlertTriangle size={28} color={color} />
+            ),
           }}
         />
       </Tabs>

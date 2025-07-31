@@ -50,7 +50,7 @@ export function PointsDashboard() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 100,
+    paddingTop: 20,
     padding: 20,
     alignItems: "center",
     justifyContent: "center",

@@ -11,7 +11,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView
         contentContainerStyle={{
           paddingBottom: insets.bottom + 80, // Safe area + tab bar height

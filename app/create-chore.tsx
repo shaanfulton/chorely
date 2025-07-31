@@ -1,5 +1,7 @@
+import IconSelector from "@/components/IconSelector";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import UrgencySelector from "@/components/UrgencySelector";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
@@ -24,8 +26,11 @@ export default function CreateChoreScreen() {
   const [choreDescription, setChoreDescription] = useState(
     choreData?.description || ""
   );
-  const [choreTime, setChoreTime] = useState(choreData?.defaultTime || "");
+  const [choreUrgency, setChoreUrgency] = useState(choreData?.urgency ?? 0); // 0 = low, 1 = medium, 2 = high
   const [choreIcon, setChoreIcon] = useState(choreData?.icon || "help-circle");
+  const [isIconSelectorVisible, setIsIconSelectorVisible] = useState(false);
+
+  const urgencyOptions = ["1 day", "2 days", "3 days"];
 
   const handleSave = () => {
     if (!choreName.trim()) {
@@ -52,18 +57,21 @@ export default function CreateChoreScreen() {
   return (
     <ThemedView style={styles.container}>
       <ScrollView style={styles.content}>
-        <View style={styles.iconPreview}>
+        <TouchableOpacity
+          style={styles.iconPreview}
+          onPress={() => setIsIconSelectorVisible(true)}
+        >
           <View style={styles.iconContainer}>
             <IconComponent size={40} color="#666" />
           </View>
           <ThemedText type="default" style={styles.iconLabel}>
-            Chore Icon
+            Tap to change icon
           </ThemedText>
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.formGroup}>
           <ThemedText type="defaultSemiBold" style={styles.label}>
-            Chore Name *
+            Chore Name
           </ThemedText>
           <TextInput
             style={styles.input}
@@ -91,31 +99,13 @@ export default function CreateChoreScreen() {
 
         <View style={styles.formGroup}>
           <ThemedText type="defaultSemiBold" style={styles.label}>
-            Estimated Time
+            Urgency
           </ThemedText>
-          <TextInput
-            style={styles.input}
-            value={choreTime}
-            onChangeText={setChoreTime}
-            placeholder="e.g., 30m, 1h, 2h 30m"
-            placeholderTextColor="#999"
+          <UrgencySelector
+            options={urgencyOptions}
+            selectedIndex={choreUrgency}
+            onSelect={setChoreUrgency}
           />
-        </View>
-
-        <View style={styles.formGroup}>
-          <ThemedText type="defaultSemiBold" style={styles.label}>
-            Icon Name
-          </ThemedText>
-          <TextInput
-            style={styles.input}
-            value={choreIcon}
-            onChangeText={setChoreIcon}
-            placeholder="e.g., brush, trash-2, droplets"
-            placeholderTextColor="#999"
-          />
-          <ThemedText type="default" style={styles.helpText}>
-            Use Lucide icon names (e.g., trash-2, brush, droplets, wind)
-          </ThemedText>
         </View>
 
         <TouchableOpacity style={styles.createButton} onPress={handleSave}>
@@ -124,6 +114,13 @@ export default function CreateChoreScreen() {
           </ThemedText>
         </TouchableOpacity>
       </ScrollView>
+
+      <IconSelector
+        visible={isIconSelectorVisible}
+        onClose={() => setIsIconSelectorVisible(false)}
+        onSelectIcon={setChoreIcon}
+        selectedIcon={choreIcon}
+      />
     </ThemedView>
   );
 }
