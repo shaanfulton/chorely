@@ -1,17 +1,20 @@
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import { getLucideIcon } from "@/utils/iconUtils";
 import React from "react";
 import { StyleSheet, View } from "react-native";
 
 export function ChoreListItem({
   chore,
 }: {
-  chore: { name: string; time: string };
+  chore: { name: string; time: string; icon: string };
 }) {
+  // Get the lucide icon component using utility function
+  const IconComponent = getLucideIcon(chore.icon);
   return (
     <ThemedView style={styles.container}>
       <View style={styles.iconContainer}>
-        {/* Placeholder for chore icon */}
+        <IconComponent size={24} color="#666" />
       </View>
       <View style={styles.textContainer}>
         <ThemedText type="defaultSemiBold">{chore.name}</ThemedText>
@@ -39,6 +42,8 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     backgroundColor: "#E0E0E0", // Example color
     marginRight: 15,
+    justifyContent: "center",
+    alignItems: "center",
   },
   textContainer: {
     flex: 1,

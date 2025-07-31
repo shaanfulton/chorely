@@ -4,9 +4,10 @@ import React from "react";
 import { StyleSheet, View } from "react-native";
 
 const MY_CHORES = [
-  { name: "Sweeping", time: "12h 10m" },
-  { name: "Sweeping", time: "12h 10m" },
-  { name: "Sweeping", time: "12h 10m" },
+  { name: "Sweeping", time: "12h 10m", icon: "brush" },
+  { name: "Washing Dishes", time: "30m", icon: "droplets" },
+  { name: "Vacuum", time: "45m", icon: "wind" },
+  { name: "Laundry", time: "2h", icon: "shirt" },
 ];
 
 export function ChoreList() {
