@@ -1,5 +1,5 @@
 import { TodoItem } from "@/data/mock";
-import React, { useState } from "react";
+import React from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -7,25 +7,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { CenterModal } from "./CenterModal";
-import { ThemedText } from "./ThemedText";
-import { ThemedView } from "./ThemedView";
 
 interface ChecklistProps {
   items: TodoItem[];
+  onItemPress: (item: TodoItem) => void;
 }
 
-export function Checklist({ items }: ChecklistProps) {
-  const [selectedItem, setSelectedItem] = useState<TodoItem | null>(null);
-
-  const handleItemPress = (item: TodoItem) => {
-    setSelectedItem(item);
-  };
-
-  const handleCloseModal = () => {
-    setSelectedItem(null);
-  };
-
+export function Checklist({ items, onItemPress }: ChecklistProps) {
   return (
     <View style={styles.container}>
       <ScrollView>
@@ -33,24 +21,13 @@ export function Checklist({ items }: ChecklistProps) {
           <TouchableOpacity
             key={index}
             style={styles.itemContainer}
-            onPress={() => handleItemPress(item)}
+            onPress={() => onItemPress(item)}
           >
             <View style={styles.checkbox} />
             <Text style={styles.itemText}>{item.name}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
-
-      {selectedItem && (
-        <CenterModal visible={!!selectedItem} onClose={handleCloseModal}>
-          <ThemedView style={styles.modalContent}>
-            <ThemedText style={styles.modalTitle}>
-              {selectedItem.name}
-            </ThemedText>
-            <ThemedText>{selectedItem.description}</ThemedText>
-          </ThemedView>
-        </CenterModal>
-      )}
     </View>
   );
 }
@@ -77,13 +54,5 @@ const styles = StyleSheet.create({
   },
   itemText: {
     fontSize: 16,
-  },
-  modalContent: {
-    padding: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 10,
   },
 });

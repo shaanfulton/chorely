@@ -1,7 +1,8 @@
+import { CenterModal } from "@/components/CenterModal";
 import { Checklist } from "@/components/Checklist";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import { Chore, getChoreById } from "@/data/mock";
+import { Chore, TodoItem, getChoreById } from "@/data/mock";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -10,6 +11,7 @@ import { StyleSheet } from "react-native";
 export default function ChoreView() {
   const { uuid } = useLocalSearchParams();
   const [chore, setChore] = useState<Chore | null>(null);
+  const [selectedItem, setSelectedItem] = useState<TodoItem | null>(null);
 
   useEffect(() => {
     if (uuid) {
@@ -32,7 +34,21 @@ export default function ChoreView() {
     <ThemedView style={styles.container}>
       <IconComponent size={64} color="#666" />
       <ThemedText style={styles.title}>{chore.name}</ThemedText>
-      <Checklist items={chore.todos} />
+      <Checklist items={chore.todos} onItemPress={setSelectedItem} />
+
+      {selectedItem && (
+        <CenterModal
+          visible={!!selectedItem}
+          onClose={() => setSelectedItem(null)}
+        >
+          <ThemedView style={styles.modalContent}>
+            <ThemedText style={styles.modalTitle}>
+              {selectedItem.name}
+            </ThemedText>
+            <ThemedText>{selectedItem.description}</ThemedText>
+          </ThemedView>
+        </CenterModal>
+      )}
     </ThemedView>
   );
 }
@@ -50,5 +66,13 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginTop: 20,
     marginBottom: 20,
+  },
+  modalContent: {
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 10,
   },
 });
