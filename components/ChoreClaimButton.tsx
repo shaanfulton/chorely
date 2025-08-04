@@ -1,22 +1,42 @@
+import { useChore, useGlobalChores } from "@/context/ChoreContext";
 import React, { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity } from "react-native";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+} from "react-native";
 
 export function ChoreClaimButton() {
-  const [isClaimed, setIsClaimed] = useState(false);
+  const { choreUuid } = useChore();
+  const { claimChore } = useGlobalChores();
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handlePress = () => {
-    setIsClaimed(!isClaimed);
+  const handlePress = async () => {
+    try {
+      setIsLoading(true);
+      await claimChore(choreUuid);
+    } catch (error) {
+      console.error("Failed to claim chore:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <TouchableOpacity
       style={[
         styles.button,
-        { backgroundColor: isClaimed ? "#4CAF50" : "#9E9E9E" },
+        { backgroundColor: isLoading ? "#4CAF50" : "#9E9E9E" },
       ]}
       onPress={handlePress}
+      disabled={isLoading}
     >
-      <Text style={styles.buttonText}>Claim</Text>
+      {isLoading ? (
+        <ActivityIndicator size="small" color="white" />
+      ) : (
+        <Text style={styles.buttonText}>Claim</Text>
+      )}
     </TouchableOpacity>
   );
 }

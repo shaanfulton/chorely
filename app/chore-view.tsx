@@ -3,13 +3,14 @@ import { Checklist } from "@/components/Checklist";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { ChecklistProvider, useChecklist } from "@/context/ChecklistContext";
-import { Chore, TodoItem, getChoreById } from "@/data/mock";
+import { Chore, TodoItem, getChoreByIdAPI } from "@/data/mock";
 import { getLucideIcon } from "@/utils/iconUtils";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Alert, StyleSheet, TouchableOpacity, View } from "react-native";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
 
 function ChoreViewContent() {
+  const router = useRouter();
   const { uuid } = useLocalSearchParams();
   const [chore, setChore] = useState<Chore | null>(null);
   const [selectedItem, setSelectedItem] = useState<TodoItem | null>(null);
@@ -17,7 +18,7 @@ function ChoreViewContent() {
 
   useEffect(() => {
     if (uuid) {
-      const foundChore = getChoreById(uuid as string);
+      const foundChore = getChoreByIdAPI(uuid as string);
       setChore(foundChore ?? null);
       resetCompleted();
     }
@@ -56,7 +57,7 @@ function ChoreViewContent() {
         <TouchableOpacity
           style={[styles.button, !allTasksCompleted && styles.disabledButton]}
           disabled={!allTasksCompleted}
-          onPress={() => Alert.alert("Chore validated!")}
+          onPress={() => router.push(`/chore-validate?uuid=${uuid}`)}
         >
           <ThemedText style={styles.buttonText}>Validate Chore</ThemedText>
         </TouchableOpacity>

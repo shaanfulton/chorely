@@ -41,8 +41,18 @@ export function PointsDashboard() {
         </Svg>
       </View>
       <View style={styles.textContainer}>
-        <ThemedText type="title">{`${points}/${totalPoints}`}</ThemedText>
-        <ThemedText type="subtitle">Weekly Points</ThemedText>
+        <View style={styles.pointsContainer}>
+          <ThemedText style={styles.pointsText} type="title">
+            {points}
+          </ThemedText>
+          <ThemedText style={styles.denominationText} type="title">
+            {`/${totalPoints}`}
+          </ThemedText>
+        </View>
+
+        <ThemedText style={styles.pointSubtitle} type="subtitle">
+          Weekly Points
+        </ThemedText>
       </View>
     </ThemedView>
   );
@@ -61,9 +71,24 @@ const styles = StyleSheet.create({
     height: 100,
     marginRight: 20,
     justifyContent: "center",
-    alignItems: "center",
+    alignItems: "flex-start",
   },
   textContainer: {
+    alignItems: "flex-start",
+  },
+  pointsContainer: {
+    flexDirection: "row",
     alignItems: "center",
+  },
+  pointsText: {
+    fontSize: 32,
+    marginBottom: 5,
+  },
+  denominationText: {
+    fontSize: 22,
+    color: "#AAA",
+  },
+  pointSubtitle: {
+    fontSize: 12,
   },
 });

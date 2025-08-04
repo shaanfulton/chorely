@@ -1,21 +1,25 @@
 import { ChoreClaimButton } from "@/components/ChoreClaimButton";
 import { ChoreListItem } from "@/components/ChoreListItem";
 import { ThemedText } from "@/components/ThemedText";
-import { Chore, getAvailableChores } from "@/data/mock";
-import React, { useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { useGlobalChores } from "@/context/ChoreContext";
+import React from "react";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 export function AvailableChoreList() {
-  const [chores, setChores] = useState<Chore[]>([]);
+  const { availableChores, isLoading } = useGlobalChores();
 
-  useEffect(() => {
-    setChores(getAvailableChores());
-  }, []);
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <ThemedText type="subtitle">Available Chores</ThemedText>
-      {chores.map((chore) => (
+      {availableChores.map((chore) => (
         <ChoreListItem key={chore.uuid} chore={chore}>
           <ChoreClaimButton />
         </ChoreListItem>
@@ -29,5 +33,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginTop: 20,
     gap: 10,
+  },
+  centered: {
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

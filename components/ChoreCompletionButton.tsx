@@ -1,22 +1,51 @@
+import { useChore, useGlobalChores } from "@/context/ChoreContext";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity } from "react-native";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+} from "react-native";
 
 export function ChoreCompletionButton() {
-  const [isCompleted, setIsCompleted] = useState(false);
+  const { choreUuid } = useChore();
+  const { myChores, completeChore } = useGlobalChores();
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handlePress = () => {
-    setIsCompleted(!isCompleted);
+  // Find the current chore
+  const chore = myChores.find((c) => c.uuid === choreUuid);
+  const isComplete = chore?.status === "complete";
+
+  const handlePress = async () => {
+    if (isComplete) {
+      // If already complete, do nothing or show completion status
+      return;
+    }
+
+    if (chore && chore.status === "claimed") {
+      // Navigate to validation screen
+      router.push(`/chore-validate?uuid=${choreUuid}`);
+    }
   };
 
   return (
     <TouchableOpacity
       style={[
         styles.button,
-        { backgroundColor: isCompleted ? "#4CAF50" : "#9E9E9E" },
+        { backgroundColor: isComplete ? "#4CAF50" : "#9E9E9E" },
       ]}
       onPress={handlePress}
+      disabled={isLoading}
     >
-      <Text style={styles.buttonText}>Verify</Text>
+      {isLoading ? (
+        <ActivityIndicator size="small" color="white" />
+      ) : (
+        <Text style={styles.buttonText}>
+          {isComplete ? "Complete" : "Verify"}
+        </Text>
+      )}
     </TouchableOpacity>
   );
 }

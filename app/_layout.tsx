@@ -1,3 +1,4 @@
+import { GlobalChoreProvider } from "@/context/ChoreContext";
 import { DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
@@ -17,37 +18,51 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider value={DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="create-chore"
-            options={{
-              title: "Create Chore",
-              headerBackTitle: "Back",
-              headerBackButtonDisplayMode: "minimal",
-              headerTitleStyle: {
-                fontSize: 20,
-                fontWeight: "600",
-              },
-            }}
-          />
-          <Stack.Screen
-            name="chore-view"
-            options={{
-              title: "",
-              headerBackTitle: "Back",
-              headerBackButtonDisplayMode: "minimal",
-              headerTitleStyle: {
-                fontSize: 20,
-                fontWeight: "600",
-              },
-            }}
-          />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style="dark" />
-      </ThemeProvider>
+      <GlobalChoreProvider>
+        <ThemeProvider value={DefaultTheme}>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="create-chore"
+              options={{
+                title: "Create Chore",
+                headerBackTitle: "Back",
+                headerBackButtonDisplayMode: "minimal",
+                headerTitleStyle: {
+                  fontSize: 20,
+                  fontWeight: "600",
+                },
+              }}
+            />
+            <Stack.Screen
+              name="chore-view"
+              options={{
+                title: "",
+                headerBackTitle: "Back",
+                headerBackButtonDisplayMode: "minimal",
+                headerTitleStyle: {
+                  fontSize: 20,
+                  fontWeight: "600",
+                },
+              }}
+            />
+            <Stack.Screen
+              name="chore-validate"
+              options={{
+                title: "",
+                headerBackTitle: "Back",
+                headerBackButtonDisplayMode: "minimal",
+                headerTitleStyle: {
+                  fontSize: 20,
+                  fontWeight: "600",
+                },
+              }}
+            />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+          <StatusBar style="dark" />
+        </ThemeProvider>
+      </GlobalChoreProvider>
     </SafeAreaProvider>
   );
 }

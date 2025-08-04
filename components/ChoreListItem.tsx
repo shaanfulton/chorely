@@ -1,5 +1,6 @@
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import { ChoreProvider } from "@/context/ChoreContext";
 import { Chore } from "@/data/mock";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { Link } from "expo-router";
@@ -32,7 +33,9 @@ export function ChoreListItem({
             <ThemedText type="defaultSemiBold">{chore.name}</ThemedText>
             <ThemedText type="default">{chore.time}</ThemedText>
           </View>
-          <View>{children}</View>
+          <View>
+            <ChoreProvider choreUuid={chore.uuid}>{children}</ChoreProvider>
+          </View>
         </ThemedView>
       </Pressable>
     </Link>

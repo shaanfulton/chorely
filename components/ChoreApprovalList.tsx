@@ -1,30 +1,27 @@
-import { Chore, getUnapprovedChores } from "@/data/mock";
-import React, { useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { useGlobalChores } from "@/context/ChoreContext";
+import React from "react";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { ApprovalListItem } from "./ApprovalListItem";
 import { ChoreApproveButton } from "./ChoreApproveButton";
 import { ThemedText } from "./ThemedText";
 
 export function ChoreApprovalList() {
-  const [chores, setChores] = useState<Chore[]>([]);
+  const { pendingApprovalChores, isLoading } = useGlobalChores();
 
-  const fetchUnapprovedChores = () => {
-    setChores(getUnapprovedChores());
-  };
-
-  useEffect(() => {
-    setChores(getUnapprovedChores());
-  }, []);
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <ThemedText type="subtitle">Approve New Chores</ThemedText>
-      {chores.map((chore) => (
+      {pendingApprovalChores.map((chore) => (
         <ApprovalListItem key={chore.uuid} chore={chore}>
-          <ChoreApproveButton
-            choreId={chore.uuid}
-            onChoreApproved={fetchUnapprovedChores}
-          />
+          <ChoreApproveButton choreId={chore.uuid} />
         </ApprovalListItem>
       ))}
     </View>
@@ -36,5 +33,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginTop: 20,
     gap: 10,
+  },
+  centered: {
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

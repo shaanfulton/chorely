@@ -1,24 +1,47 @@
-import { approveChore } from "@/data/mock";
-import React from "react";
-import { StyleSheet, Text, TouchableOpacity } from "react-native";
+import { useGlobalChores } from "@/context/ChoreContext";
+import React, { useState } from "react";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+} from "react-native";
 
 interface ChoreApproveButtonProps {
   choreId: string;
-  onChoreApproved: () => void;
 }
 
 export const ChoreApproveButton: React.FC<ChoreApproveButtonProps> = ({
   choreId,
-  onChoreApproved,
 }) => {
-  const handlePress = () => {
-    approveChore(choreId);
-    onChoreApproved();
+  const { approveChore } = useGlobalChores();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handlePress = async () => {
+    try {
+      setIsLoading(true);
+      await approveChore(choreId);
+    } catch (error) {
+      console.error("Failed to approve chore:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <TouchableOpacity style={styles.button} onPress={handlePress}>
-      <Text style={styles.buttonText}>Approve</Text>
+    <TouchableOpacity
+      style={[
+        styles.button,
+        { backgroundColor: isLoading ? "#388E3C" : "#4CAF50" },
+      ]}
+      onPress={handlePress}
+      disabled={isLoading}
+    >
+      {isLoading ? (
+        <ActivityIndicator size="small" color="white" />
+      ) : (
+        <Text style={styles.buttonText}>Approve</Text>
+      )}
     </TouchableOpacity>
   );
 };

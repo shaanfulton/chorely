@@ -2,11 +2,12 @@ import IconSelector from "@/components/IconSelector";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import UrgencySelector from "@/components/UrgencySelector";
-import { createChore } from "@/data/mock";
+import { useGlobalChores } from "@/context/ChoreContext";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -17,6 +18,7 @@ import {
 
 export default function CreateChoreScreen() {
   const params = useLocalSearchParams();
+  const { createChore } = useGlobalChores();
 
   // Parse the chore data from params if it exists
   const choreData = params.choreData
@@ -30,32 +32,46 @@ export default function CreateChoreScreen() {
   const [choreUrgency, setChoreUrgency] = useState(choreData?.urgency ?? 0); // 0 = low, 1 = medium, 2 = high
   const [choreIcon, setChoreIcon] = useState(choreData?.icon || "help-circle");
   const [isIconSelectorVisible, setIsIconSelectorVisible] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   const urgencyOptions = ["1 day", "2 days", "3 days"];
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!choreName.trim()) {
       Alert.alert("Error", "Please enter a chore name");
       return;
     }
 
-    createChore({
-      name: choreName,
-      description: choreDescription,
-      time: urgencyOptions[choreUrgency],
-      icon: choreIcon,
-    });
+    if (isCreating) return; // Prevent double submission
 
-    Alert.alert(
-      "Chore Created",
-      `"${choreName}" has been created successfully! It is now waiting for approval.`,
-      [
-        {
-          text: "OK",
-          onPress: () => router.back(),
-        },
-      ]
-    );
+    try {
+      setIsCreating(true);
+
+      await createChore({
+        name: choreName,
+        description: choreDescription,
+        time: urgencyOptions[choreUrgency],
+        icon: choreIcon,
+      });
+
+      Alert.alert(
+        "Chore Created",
+        `"${choreName}" has been created successfully! It is now waiting for approval.`,
+        [
+          {
+            text: "OK",
+            onPress: () => router.back(),
+          },
+        ]
+      );
+    } catch (error) {
+      Alert.alert("Error", "Failed to create chore. Please try again.", [
+        { text: "OK" },
+      ]);
+      console.error("Failed to create chore:", error);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const IconComponent = getLucideIcon(choreIcon);
@@ -114,10 +130,18 @@ export default function CreateChoreScreen() {
           />
         </View>
 
-        <TouchableOpacity style={styles.createButton} onPress={handleSave}>
-          <ThemedText type="defaultSemiBold" style={styles.createButtonText}>
-            Create Chore
-          </ThemedText>
+        <TouchableOpacity
+          style={[styles.createButton, { opacity: isCreating ? 0.7 : 1 }]}
+          onPress={handleSave}
+          disabled={isCreating}
+        >
+          {isCreating ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <ThemedText type="defaultSemiBold" style={styles.createButtonText}>
+              Create Chore
+            </ThemedText>
+          )}
         </TouchableOpacity>
       </ScrollView>
 

@@ -24,7 +24,7 @@ const LOGGED_IN_USER_EMAIL = "user@example.com";
 const CHORES: Chore[] = [
   {
     uuid: uuidv4(),
-    name: "Unapproved Chore",
+    name: "Sorting Boxes",
     description: "This is an unapproved chore.",
     time: "1h 15m",
     icon: "package",
@@ -228,7 +228,7 @@ const CHORES: Chore[] = [
   },
 ];
 
-export const createChore = (
+export const createChoreAPI = (
   choreData: Omit<Chore, "uuid" | "status" | "user_email" | "todos">
 ) => {
   const newChore: Chore = {
@@ -247,7 +247,7 @@ export const createChore = (
   return newChore;
 };
 
-export const getMyChores = (): Chore[] => {
+export const getMyChoresAPI = (): Chore[] => {
   return CHORES.filter(
     (chore) =>
       chore.user_email === LOGGED_IN_USER_EMAIL &&
@@ -255,28 +255,46 @@ export const getMyChores = (): Chore[] => {
   );
 };
 
-export const getAvailableChores = (): Chore[] => {
+export const getAvailableChoresAPI = (): Chore[] => {
   return CHORES.filter(
     (chore) => chore.user_email === null && chore.status === "unclaimed"
   );
 };
 
-export const getChoreById = (uuid: string): Chore | undefined => {
+export const getChoreByIdAPI = (uuid: string): Chore | undefined => {
   return CHORES.find((chore) => chore.uuid === uuid);
 };
 
-export const getUnapprovedChores = (): Chore[] => {
+export const getUnapprovedChoresAPI = (): Chore[] => {
   return CHORES.filter((chore) => chore.status === "unapproved");
 };
 
-export const approveChore = (uuid: string): void => {
+export const approveChoreAPI = (uuid: string): void => {
   const chore = CHORES.find((chore) => chore.uuid === uuid);
   if (chore) {
     chore.status = "unclaimed";
   }
 };
 
-export const completeChore = (uuid: string): void => {
+export const claimChoreAPI = (
+  uuid: string,
+  email: string = LOGGED_IN_USER_EMAIL
+): void => {
+  const chore = CHORES.find((chore) => chore.uuid === uuid);
+  if (chore && chore.status === "unclaimed") {
+    chore.user_email = email;
+    chore.status = "claimed";
+  }
+};
+
+export const completeChoreAPI = (uuid: string): void => {
+  const chore = CHORES.find((chore) => chore.uuid === uuid);
+  if (chore) {
+    chore.status = "complete";
+  }
+};
+
+export const verifyChoreAPI = (uuid: string): void => {
   const chore = CHORES.find((chore) => chore.uuid === uuid);
   if (chore) {
     chore.status = "complete";
