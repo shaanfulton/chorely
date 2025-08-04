@@ -1,11 +1,11 @@
+import { Button } from "@/components/Button";
 import { CenterModal } from "@/components/CenterModal";
 import { Checklist } from "@/components/Checklist";
-import { ChoreClaimButton } from "@/components/ChoreClaimButton";
-import { ChoreCompletionButton } from "@/components/ChoreCompletionButton";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import { Colors } from "@/constants/Colors";
 import { ChecklistProvider, useChecklist } from "@/context/ChecklistContext";
-import { ChoreProvider } from "@/context/ChoreContext";
+import { ChoreProvider, useGlobalChores } from "@/context/ChoreContext";
 import {
   Chore,
   TodoItem,
@@ -13,14 +13,19 @@ import {
   getCurrentUserEmail,
 } from "@/data/mock";
 import { getLucideIcon } from "@/utils/iconUtils";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 
 function ChoreViewContent({ chore }: { chore: Chore }) {
   const [selectedItem, setSelectedItem] = useState<TodoItem | null>(null);
   const { isAllCompleted, resetCompleted } = useChecklist();
+  const { claimChore } = useGlobalChores();
+  const router = useRouter();
   const currentUserEmail = getCurrentUserEmail();
+  const [isClaimingChore, setIsClaimingChore] = useState(false);
+  const [isNavigatingToValidation, setIsNavigatingToValidation] =
+    useState(false);
 
   useEffect(() => {
     resetCompleted();
@@ -28,6 +33,29 @@ function ChoreViewContent({ chore }: { chore: Chore }) {
 
   const IconComponent = getLucideIcon(chore.icon);
   const allTasksCompleted = isAllCompleted(chore.todos.length);
+
+  const handleClaimChore = async () => {
+    try {
+      setIsClaimingChore(true);
+      await claimChore(chore.uuid);
+    } catch (error) {
+      console.error("Failed to claim chore:", error);
+    } finally {
+      setIsClaimingChore(false);
+    }
+  };
+
+  const handleVerifyChore = async () => {
+    if (chore && chore.status === "claimed") {
+      try {
+        setIsNavigatingToValidation(true);
+        // Navigate to validation screen
+        router.push(`/chore-validate?uuid=${chore.uuid}`);
+      } finally {
+        setIsNavigatingToValidation(false);
+      }
+    }
+  };
 
   // Determine what to render based on chore ownership and status
   const getButtonContent = () => {
@@ -42,12 +70,29 @@ function ChoreViewContent({ chore }: { chore: Chore }) {
           </ThemedView>
         );
       }
-      return <ChoreCompletionButton />;
+      return (
+        <Button
+          title="Verify"
+          backgroundColor={Colors.metro.blue}
+          isLoading={isNavigatingToValidation}
+          onPress={handleVerifyChore}
+          size="medium"
+        />
+      );
     }
 
     // If chore is unclaimed (approved but not claimed) - show claim button
     if (chore.status === "unclaimed" && chore.user_email === null) {
-      return <ChoreClaimButton />;
+      return (
+        <Button
+          title="Claim"
+          backgroundColor={Colors.metro.gray}
+          loadingBackgroundColor={Colors.metro.green}
+          isLoading={isClaimingChore}
+          onPress={handleClaimChore}
+          size="medium"
+        />
+      );
     }
 
     // If chore is owned by a different user - show warning

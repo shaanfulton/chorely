@@ -1,3 +1,4 @@
+import { Button } from "@/components/Button";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useGlobalChores } from "@/context/ChoreContext";
@@ -5,14 +6,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { BadgeCheck } from "lucide-react-native";
 import React, { useRef, useState } from "react";
-import {
-  Animated,
-  Button,
-  Easing,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Animated, Easing, StyleSheet, View } from "react-native";
 
 export default function ChoreValidate() {
   const router = useRouter();
@@ -96,7 +90,11 @@ export default function ChoreValidate() {
         <ThemedText style={{ textAlign: "center", marginBottom: 20 }}>
           We need your permission to show the camera
         </ThemedText>
-        <Button onPress={requestPermission} title="Grant Permission" />
+        <Button
+          onPress={requestPermission}
+          title="Grant Permission"
+          size="medium"
+        />
       </ThemedView>
     );
   }
@@ -107,13 +105,13 @@ export default function ChoreValidate() {
       <View style={styles.cameraContainer}>
         <CameraView style={styles.camera} />
       </View>
-      <TouchableOpacity
-        style={[styles.button, { opacity: isAnimating ? 0.5 : 1 }]}
+      <Button
+        title="Take Photo"
         onPress={handleTakePhoto}
         disabled={isAnimating}
-      >
-        <ThemedText style={styles.buttonText}>Take Photo</ThemedText>
-      </TouchableOpacity>
+        isLoading={isAnimating}
+        size="large"
+      />
 
       {/* Backdrop */}
       <Animated.View
@@ -169,15 +167,5 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
-  },
-  button: {
-    backgroundColor: "#007BFF",
-    padding: 15,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  buttonText: {
-    color: "white",
-    fontWeight: "bold",
   },
 });
