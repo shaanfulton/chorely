@@ -1,11 +1,7 @@
+import { Colors } from "@/constants/Colors";
 import { useGlobalChores } from "@/context/ChoreContext";
 import React, { useState } from "react";
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-} from "react-native";
+import { Button } from "./Button";
 
 interface ChoreApproveButtonProps {
   choreId: string;
@@ -29,36 +25,13 @@ export const ChoreApproveButton: React.FC<ChoreApproveButtonProps> = ({
   };
 
   return (
-    <TouchableOpacity
-      style={[
-        styles.button,
-        { backgroundColor: isLoading ? "#388E3C" : "#4CAF50" },
-      ]}
+    <Button
+      title="Approve"
+      backgroundColor={Colors.metro.green}
+      loadingBackgroundColor={Colors.metro.teal}
+      isLoading={isLoading}
       onPress={handlePress}
-      disabled={isLoading}
-    >
-      {isLoading ? (
-        <ActivityIndicator size="small" color="white" />
-      ) : (
-        <Text style={styles.buttonText}>Approve</Text>
-      )}
-    </TouchableOpacity>
+      size="small"
+    />
   );
 };
-
-const styles = StyleSheet.create({
-  button: {
-    backgroundColor: "#4CAF50",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-    justifyContent: "center",
-    alignItems: "center",
-    minWidth: 50,
-  },
-  buttonText: {
-    color: "white",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-});

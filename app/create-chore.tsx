@@ -1,13 +1,14 @@
+import { Button } from "@/components/Button";
 import IconSelector from "@/components/IconSelector";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import UrgencySelector from "@/components/UrgencySelector";
+import { Colors } from "@/constants/Colors";
 import { useGlobalChores } from "@/context/ChoreContext";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -130,19 +131,14 @@ export default function CreateChoreScreen() {
           />
         </View>
 
-        <TouchableOpacity
-          style={[styles.createButton, { opacity: isCreating ? 0.7 : 1 }]}
+        <Button
+          title="Create Chore"
+          backgroundColor={Colors.metro.blue}
+          isLoading={isCreating}
           onPress={handleSave}
-          disabled={isCreating}
-        >
-          {isCreating ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <ThemedText type="defaultSemiBold" style={styles.createButtonText}>
-              Create Chore
-            </ThemedText>
-          )}
-        </TouchableOpacity>
+          size="large"
+          style={styles.createButton}
+        />
       </ScrollView>
 
       <IconSelector
@@ -222,15 +218,7 @@ const styles = StyleSheet.create({
     color: "#666",
   },
   createButton: {
-    backgroundColor: "#007AFF",
-    borderRadius: 8,
-    padding: 15,
-    alignItems: "center",
     marginTop: 30,
     marginBottom: 40,
-  },
-  createButtonText: {
-    color: "#fff",
-    fontSize: 16,
   },
 });

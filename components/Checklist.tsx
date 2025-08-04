@@ -1,3 +1,4 @@
+import { Colors } from "@/constants/Colors";
 import { useChecklist } from "@/context/ChecklistContext";
 import { TodoItem } from "@/data/mock";
 import React from "react";
@@ -66,8 +67,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   checked: {
-    backgroundColor: "#007BFF",
-    borderColor: "#007BFF",
+    backgroundColor: Colors.metro.blue,
+    borderColor: Colors.metro.blue,
   },
   checkmark: {
     color: "white",

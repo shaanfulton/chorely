@@ -1,11 +1,7 @@
+import { Colors } from "@/constants/Colors";
 import { useChore } from "@/context/ChoreContext";
 import React from "react";
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-} from "react-native";
+import { Button } from "./Button";
 
 export function ChoreClaimButton() {
   const { claimChore, isLoading } = useChore();
@@ -19,35 +15,13 @@ export function ChoreClaimButton() {
   };
 
   return (
-    <TouchableOpacity
-      style={[
-        styles.button,
-        { backgroundColor: isLoading ? "#4CAF50" : "#9E9E9E" },
-      ]}
+    <Button
+      title="Claim"
+      backgroundColor={Colors.metro.gray}
+      loadingBackgroundColor={Colors.metro.green}
+      isLoading={isLoading}
       onPress={handlePress}
-      disabled={isLoading}
-    >
-      {isLoading ? (
-        <ActivityIndicator size="small" color="white" />
-      ) : (
-        <Text style={styles.buttonText}>Claim</Text>
-      )}
-    </TouchableOpacity>
+      size="small"
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  button: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-    justifyContent: "center",
-    alignItems: "center",
-    minWidth: 50,
-  },
-  buttonText: {
-    color: "white",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-});

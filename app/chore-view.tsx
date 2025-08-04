@@ -15,7 +15,7 @@ import {
 import { getLucideIcon } from "@/utils/iconUtils";
 import { useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 function ChoreViewContent({ chore }: { chore: Chore }) {
   const [selectedItem, setSelectedItem] = useState<TodoItem | null>(null);
@@ -35,14 +35,11 @@ function ChoreViewContent({ chore }: { chore: Chore }) {
     if (chore.status === "claimed" && chore.user_email === currentUserEmail) {
       if (!allTasksCompleted) {
         return (
-          <TouchableOpacity
-            style={[styles.button, styles.disabledButton]}
-            disabled
-          >
-            <ThemedText style={styles.buttonText}>
+          <ThemedView style={styles.infoContainer}>
+            <ThemedText style={styles.infoText}>
               Complete All Tasks First
             </ThemedText>
-          </TouchableOpacity>
+          </ThemedView>
         );
       }
       return <ChoreCompletionButton />;
@@ -64,11 +61,11 @@ function ChoreViewContent({ chore }: { chore: Chore }) {
       );
     }
 
-    // Default case - show disabled validate button (for unapproved chores, etc.)
+    // Default case - show info message (for unapproved chores, etc.)
     return (
-      <TouchableOpacity style={[styles.button, styles.disabledButton]} disabled>
-        <ThemedText style={styles.buttonText}>Chore Not Available</ThemedText>
-      </TouchableOpacity>
+      <ThemedView style={styles.infoContainer}>
+        <ThemedText style={styles.infoText}>Chore Not Available</ThemedText>
+      </ThemedView>
     );
   };
 
@@ -149,18 +146,18 @@ const styles = StyleSheet.create({
     width: "100%",
     padding: 20,
   },
-  button: {
-    backgroundColor: "#007BFF",
-    padding: 15,
+  infoContainer: {
+    backgroundColor: "#E3F2FD",
+    borderColor: "#BBDEFB",
+    borderWidth: 1,
     borderRadius: 8,
+    padding: 15,
     alignItems: "center",
   },
-  disabledButton: {
-    backgroundColor: "#A9A9A9",
-  },
-  buttonText: {
-    color: "white",
-    fontWeight: "bold",
+  infoText: {
+    color: "#1565C0",
+    fontWeight: "600",
+    textAlign: "center",
   },
   warningContainer: {
     backgroundColor: "#FFF3CD",
