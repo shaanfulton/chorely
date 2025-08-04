@@ -10,20 +10,14 @@ import {
 
 export function ChoreCompletionButton() {
   const { choreUuid } = useChore();
-  const { myChores, completeChore } = useGlobalChores();
+  const { myChores } = useGlobalChores();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
   // Find the current chore
   const chore = myChores.find((c) => c.uuid === choreUuid);
-  const isComplete = chore?.status === "complete";
 
   const handlePress = async () => {
-    if (isComplete) {
-      // If already complete, do nothing or show completion status
-      return;
-    }
-
     if (chore && chore.status === "claimed") {
       // Navigate to validation screen
       router.push(`/chore-validate?uuid=${choreUuid}`);
@@ -32,19 +26,14 @@ export function ChoreCompletionButton() {
 
   return (
     <TouchableOpacity
-      style={[
-        styles.button,
-        { backgroundColor: isComplete ? "#4CAF50" : "#9E9E9E" },
-      ]}
+      style={[styles.button, { backgroundColor: "#9E9E9E" }]}
       onPress={handlePress}
       disabled={isLoading}
     >
       {isLoading ? (
         <ActivityIndicator size="small" color="white" />
       ) : (
-        <Text style={styles.buttonText}>
-          {isComplete ? "Complete" : "Verify"}
-        </Text>
+        <Text style={styles.buttonText}>Verify</Text>
       )}
     </TouchableOpacity>
   );

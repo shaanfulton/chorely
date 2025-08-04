@@ -158,12 +158,8 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
       const choreToUpdate = myChores.find((chore) => chore.uuid === choreUuid);
       if (!choreToUpdate) return;
 
-      // Optimistic update - mark as complete
-      const updatedMy = myChores.map((chore) =>
-        chore.uuid === choreUuid
-          ? { ...chore, status: "complete" as const }
-          : chore
-      );
+      // Optimistic update - remove from myChores list
+      const updatedMy = myChores.filter((chore) => chore.uuid !== choreUuid);
       setMyChores(updatedMy);
 
       try {

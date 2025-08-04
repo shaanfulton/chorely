@@ -250,8 +250,7 @@ export const createChoreAPI = (
 export const getMyChoresAPI = (): Chore[] => {
   return CHORES.filter(
     (chore) =>
-      chore.user_email === LOGGED_IN_USER_EMAIL &&
-      (chore.status === "claimed" || chore.status === "complete")
+      chore.user_email === LOGGED_IN_USER_EMAIL && chore.status === "claimed"
   );
 };
 
