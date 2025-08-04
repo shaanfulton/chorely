@@ -17,23 +17,54 @@ import React, {
   useState,
 } from "react";
 
-// Individual chore context (for chore detail screens)
+// Individual chore context (for chore detail screens and list items)
 interface ChoreContextType {
-  choreUuid: string;
+  chore: Chore;
+  claimChore: () => Promise<void>;
+  completeChore: () => Promise<void>;
+  isLoading: boolean;
 }
 
 const ChoreContext = createContext<ChoreContextType | undefined>(undefined);
 
 interface ChoreProviderProps {
-  choreUuid: string;
+  chore: Chore;
   children: ReactNode;
 }
 
-export function ChoreProvider({ choreUuid, children }: ChoreProviderProps) {
+export function ChoreProvider({ chore, children }: ChoreProviderProps) {
+  const globalContext = useContext(GlobalChoreContext);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const claimChore = useCallback(async () => {
+    if (!globalContext) return;
+    setIsLoading(true);
+    try {
+      await globalContext.claimChore(chore.uuid);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [globalContext, chore.uuid]);
+
+  const completeChore = useCallback(async () => {
+    if (!globalContext) return;
+    setIsLoading(true);
+    try {
+      await globalContext.completeChore(chore.uuid);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [globalContext, chore.uuid]);
+
+  const value: ChoreContextType = {
+    chore,
+    claimChore,
+    completeChore,
+    isLoading,
+  };
+
   return (
-    <ChoreContext.Provider value={{ choreUuid }}>
-      {children}
-    </ChoreContext.Provider>
+    <ChoreContext.Provider value={value}>{children}</ChoreContext.Provider>
   );
 }
 

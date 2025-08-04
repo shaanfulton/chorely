@@ -1,5 +1,5 @@
-import { useChore, useGlobalChores } from "@/context/ChoreContext";
-import React, { useState } from "react";
+import { useChore } from "@/context/ChoreContext";
+import React from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -8,18 +8,13 @@ import {
 } from "react-native";
 
 export function ChoreClaimButton() {
-  const { choreUuid } = useChore();
-  const { claimChore } = useGlobalChores();
-  const [isLoading, setIsLoading] = useState(false);
+  const { claimChore, isLoading } = useChore();
 
   const handlePress = async () => {
     try {
-      setIsLoading(true);
-      await claimChore(choreUuid);
+      await claimChore();
     } catch (error) {
       console.error("Failed to claim chore:", error);
-    } finally {
-      setIsLoading(false);
     }
   };
 

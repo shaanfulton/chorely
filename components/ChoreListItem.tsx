@@ -34,7 +34,7 @@ export function ChoreListItem({
             <ThemedText type="default">{chore.time}</ThemedText>
           </View>
           <View>
-            <ChoreProvider choreUuid={chore.uuid}>{children}</ChoreProvider>
+            <ChoreProvider chore={chore}>{children}</ChoreProvider>
           </View>
         </ThemedView>
       </Pressable>

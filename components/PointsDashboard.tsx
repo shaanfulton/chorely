@@ -17,18 +17,18 @@ export function PointsDashboard() {
   return (
     <ThemedView style={styles.container}>
       <View style={styles.progressContainer}>
-        <Svg width="100" height="100" viewBox="0 0 100 100">
+        <Svg width="120" height="120" viewBox="0 0 120 120">
           <Circle
-            cx="50"
-            cy="50"
+            cx="60"
+            cy="60"
             r="40"
             stroke="#e6e6e6"
             strokeWidth="10"
             fill="transparent"
           />
           <Circle
-            cx="50"
-            cy="50"
+            cx="60"
+            cy="60"
             r="40"
             stroke="#FDBF50"
             strokeWidth="10"
@@ -36,7 +36,7 @@ export function PointsDashboard() {
             strokeDasharray="251.2"
             strokeDashoffset={strokeDashoffset}
             strokeLinecap="round"
-            transform="rotate(-90 50 50)"
+            transform="rotate(-90 60 60)"
           />
         </Svg>
       </View>
@@ -63,12 +63,12 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     padding: 20,
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
     flexDirection: "row",
   },
   progressContainer: {
-    width: 100,
-    height: 100,
+    width: 120,
+    height: 120,
     marginRight: 20,
     justifyContent: "center",
     alignItems: "flex-start",
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   denominationText: {
-    fontSize: 22,
+    fontSize: 32,
     color: "#AAA",
   },
   pointSubtitle: {

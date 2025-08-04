@@ -21,6 +21,10 @@ export interface Chore {
 
 const LOGGED_IN_USER_EMAIL = "user@example.com";
 
+export const getCurrentUserEmail = (): string => {
+  return LOGGED_IN_USER_EMAIL;
+};
+
 const CHORES: Chore[] = [
   {
     uuid: uuidv4(),

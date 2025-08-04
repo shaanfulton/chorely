@@ -1,6 +1,6 @@
-import { useChore, useGlobalChores } from "@/context/ChoreContext";
+import { useChore } from "@/context/ChoreContext";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -9,18 +9,13 @@ import {
 } from "react-native";
 
 export function ChoreCompletionButton() {
-  const { choreUuid } = useChore();
-  const { myChores } = useGlobalChores();
+  const { chore, isLoading } = useChore();
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-
-  // Find the current chore
-  const chore = myChores.find((c) => c.uuid === choreUuid);
 
   const handlePress = async () => {
     if (chore && chore.status === "claimed") {
       // Navigate to validation screen
-      router.push(`/chore-validate?uuid=${choreUuid}`);
+      router.push(`/chore-validate?uuid=${chore.uuid}`);
     }
   };
 
