@@ -11,4 +11,4 @@ COPY . .
 RUN npm run build
 
 EXPOSE 3000
-CMD ["npm", "start"]
+CMD ["npx", "expo", "start", "--tunnel", "--dev-client", "--no-interactive", "--host", "0.0.0.0"]
