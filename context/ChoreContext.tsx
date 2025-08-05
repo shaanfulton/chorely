@@ -7,6 +7,10 @@ import {
   getAvailableChoresAPI,
   getMyChoresAPI,
   getUnapprovedChoresAPI,
+  getUserHomesAPI,
+  Home,
+  loginUserAPI,
+  User,
 } from "@/data/mock";
 import React, {
   createContext,
@@ -78,7 +82,12 @@ export function useChore() {
 
 // Global chore state management context
 interface GlobalChoreContextType {
-  // State
+  // User State
+  currentUser: User | null;
+  currentHome: Home | null;
+  userHomes: Home[];
+
+  // Chore State
   availableChores: Chore[];
   myChores: Chore[];
   pendingApprovalChores: Chore[];
@@ -86,12 +95,19 @@ interface GlobalChoreContextType {
   isRefreshing: boolean;
   error: string | null;
 
-  // Actions
+  // User Actions
+  loginUser: (email: string) => Promise<boolean>;
+  switchHome: (homeId: string) => Promise<void>;
+
+  // Chore Actions
   claimChore: (choreUuid: string) => Promise<void>;
   completeChore: (choreUuid: string) => Promise<void>;
   approveChore: (choreUuid: string) => Promise<void>;
   createChore: (
-    choreData: Omit<Chore, "uuid" | "status" | "user_email" | "todos">
+    choreData: Omit<
+      Chore,
+      "uuid" | "status" | "user_email" | "todos" | "homeID"
+    >
   ) => Promise<Chore>;
   refreshAllData: () => Promise<void>;
   clearError: () => void;
@@ -106,6 +122,12 @@ interface GlobalChoreProviderProps {
 }
 
 export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
+  // User state
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentHome, setCurrentHome] = useState<Home | null>(null);
+  const [userHomes, setUserHomes] = useState<Home[]>([]);
+
+  // Chore state
   const [availableChores, setAvailableChores] = useState<Chore[]>([]);
   const [myChores, setMyChores] = useState<Chore[]>([]);
   const [pendingApprovalChores, setPendingApprovalChores] = useState<Chore[]>(
@@ -115,13 +137,56 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch all chore data
-  const fetchAllData = useCallback(async () => {
+  // Login user and set up initial state
+  const loginUser = useCallback(async (email: string): Promise<boolean> => {
     try {
       setError(null);
-      const available = getAvailableChoresAPI();
-      const my = getMyChoresAPI();
-      const pending = getUnapprovedChoresAPI();
+      const user = loginUserAPI(email);
+      if (!user) {
+        setError("User not found");
+        return false;
+      }
+
+      setCurrentUser(user);
+
+      // Get user's homes
+      const homes = getUserHomesAPI(email);
+      setUserHomes(homes);
+
+      // Set first home as current if available
+      if (homes.length > 0) {
+        setCurrentHome(homes[0]);
+      }
+
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to login");
+      return false;
+    }
+  }, []);
+
+  // Switch home
+  const switchHome = useCallback(
+    async (homeId: string) => {
+      const home = userHomes.find((h) => h.id === homeId);
+      if (home) {
+        setCurrentHome(home);
+        // Refresh data for new home
+        await fetchAllData();
+      }
+    },
+    [userHomes]
+  );
+
+  // Fetch all chore data for current home
+  const fetchAllData = useCallback(async () => {
+    if (!currentUser || !currentHome) return;
+
+    try {
+      setError(null);
+      const available = getAvailableChoresAPI(currentHome.id);
+      const my = getMyChoresAPI(currentUser.email, currentHome.id);
+      const pending = getUnapprovedChoresAPI(currentHome.id);
 
       setAvailableChores(available);
       setMyChores(my);
@@ -129,17 +194,27 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch chores");
     }
-  }, []);
+  }, [currentUser, currentHome]);
 
-  // Initial data load
+  // Auto-login with default user on mount
   useEffect(() => {
-    const loadData = async () => {
+    const initializeUser = async () => {
       setIsLoading(true);
-      await fetchAllData();
+      const loginSuccess = await loginUser("user@example.com");
+      if (loginSuccess) {
+        // fetchAllData will be called automatically due to currentUser/currentHome change
+      }
       setIsLoading(false);
     };
-    loadData();
-  }, [fetchAllData]);
+    initializeUser();
+  }, [loginUser]);
+
+  // Fetch data when user or home changes
+  useEffect(() => {
+    if (currentUser && currentHome) {
+      fetchAllData();
+    }
+  }, [currentUser, currentHome, fetchAllData]);
 
   // Refresh data (for pull-to-refresh)
   const refreshAllData = useCallback(async () => {
@@ -151,6 +226,8 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
   // Claim chore with optimistic updates
   const claimChore = useCallback(
     async (choreUuid: string) => {
+      if (!currentUser) return;
+
       const choreToMove = availableChores.find(
         (chore) => chore.uuid === choreUuid
       );
@@ -163,7 +240,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
       const optimisticChore = {
         ...choreToMove,
         status: "claimed" as const,
-        user_email: "user@example.com",
+        user_email: currentUser.email,
       };
       const updatedMy = [...myChores, optimisticChore];
 
@@ -172,7 +249,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
 
       try {
         // Make API call
-        claimChoreAPI(choreUuid);
+        claimChoreAPI(choreUuid, currentUser.email);
       } catch (err) {
         // Rollback on error
         setAvailableChores(availableChores);
@@ -180,7 +257,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
         setError(err instanceof Error ? err.message : "Failed to claim chore");
       }
     },
-    [availableChores, myChores]
+    [availableChores, myChores, currentUser]
   );
 
   // Complete chore with optimistic updates
@@ -246,8 +323,15 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
   // Create chore with optimistic updates
   const createChore = useCallback(
     async (
-      choreData: Omit<Chore, "uuid" | "status" | "user_email" | "todos">
+      choreData: Omit<
+        Chore,
+        "uuid" | "status" | "user_email" | "todos" | "homeID"
+      >
     ) => {
+      if (!currentHome) {
+        throw new Error("No home selected");
+      }
+
       // Create a temporary chore for optimistic update
       const tempUuid = `temp_${Date.now()}`;
       const optimisticChore: Chore = {
@@ -255,6 +339,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
         uuid: tempUuid,
         user_email: null,
         status: "unapproved",
+        homeID: currentHome.id,
         todos: [
           { name: "Item 1", description: "Detailed description for item 1." },
           { name: "Item 2", description: "Detailed description for item 2." },
@@ -268,7 +353,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
 
       try {
         // Make API call and get the real chore with proper UUID
-        const newChore = createChoreAPI(choreData);
+        const newChore = createChoreAPI(choreData, currentHome.id);
 
         // Replace the temporary chore with the real one
         const finalPending = updatedPending.map((chore) =>
@@ -286,7 +371,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
         throw new Error(errorMessage);
       }
     },
-    [pendingApprovalChores]
+    [pendingApprovalChores, currentHome]
   );
 
   const clearError = useCallback(() => {
@@ -294,12 +379,24 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
   }, []);
 
   const value: GlobalChoreContextType = {
+    // User state
+    currentUser,
+    currentHome,
+    userHomes,
+
+    // Chore state
     availableChores,
     myChores,
     pendingApprovalChores,
     isLoading,
     isRefreshing,
     error,
+
+    // User actions
+    loginUser,
+    switchHome,
+
+    // Chore actions
     claimChore,
     completeChore,
     approveChore,

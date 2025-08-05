@@ -8,6 +8,17 @@ export interface TodoItem {
   description: string;
 }
 
+export interface User {
+  email: string;
+  homeIDs: string[];
+}
+
+export interface Home {
+  id: string;
+  name: string;
+  address: string;
+}
+
 export interface Chore {
   uuid: string;
   name: string;
@@ -17,12 +28,53 @@ export interface Chore {
   user_email: string | null;
   status: ChoreStatus;
   todos: TodoItem[];
+  homeID: string;
 }
 
-const LOGGED_IN_USER_EMAIL = "user@example.com";
+// Mock data for homes
+const HOMES: Home[] = [
+  {
+    id: "home_1",
+    name: "Main House",
+    address: "123 Main St, Berkeley, CA",
+  },
+  {
+    id: "home_2",
+    name: "Summer Cabin",
+    address: "456 Lake View Dr, Tahoe, CA",
+  },
+  {
+    id: "home_3",
+    name: "Downtown Apartment",
+    address: "789 Market St, San Francisco, CA",
+  },
+];
+
+// Mock data for users
+const USERS: User[] = [
+  {
+    email: "user@example.com",
+    homeIDs: ["home_1", "home_2"],
+  },
+  {
+    email: "roommate@example.com",
+    homeIDs: ["home_1"],
+  },
+  {
+    email: "family@example.com",
+    homeIDs: ["home_2", "home_3"],
+  },
+];
+
+const DEFAULT_USER_EMAIL = "user@example.com";
+const DEFAULT_HOME_ID = "home_1";
 
 export const getCurrentUserEmail = (): string => {
-  return LOGGED_IN_USER_EMAIL;
+  return DEFAULT_USER_EMAIL;
+};
+
+export const getCurrentHomeID = (): string => {
+  return DEFAULT_HOME_ID;
 };
 
 const CHORES: Chore[] = [
@@ -34,6 +86,7 @@ const CHORES: Chore[] = [
     icon: "package",
     user_email: null,
     status: "unapproved",
+    homeID: "home_1",
     todos: [
       { name: "Step 1", description: "Detailed description for step 1." },
       { name: "Step 2", description: "Detailed description for step 2." },
@@ -47,6 +100,7 @@ const CHORES: Chore[] = [
     icon: "package",
     user_email: null,
     status: "unclaimed",
+    homeID: "home_1",
     todos: [
       {
         name: "Clear shelves",
@@ -74,6 +128,7 @@ const CHORES: Chore[] = [
     icon: "feather",
     user_email: null,
     status: "unclaimed",
+    homeID: "home_1",
     todos: [
       {
         name: "Gather supplies",
@@ -94,6 +149,7 @@ const CHORES: Chore[] = [
     icon: "droplets",
     user_email: null,
     status: "unclaimed",
+    homeID: "home_1",
     todos: [
       {
         name: "Sweep/vacuum first",
@@ -121,6 +177,7 @@ const CHORES: Chore[] = [
     icon: "trash-2",
     user_email: null,
     status: "unclaimed",
+    homeID: "home_1",
     todos: [
       {
         name: "Collect trash",
@@ -142,8 +199,9 @@ const CHORES: Chore[] = [
     description: "Sweep the front porch.",
     time: "12h 10m",
     icon: "brush",
-    user_email: LOGGED_IN_USER_EMAIL,
+    user_email: DEFAULT_USER_EMAIL,
     status: "claimed",
+    homeID: "home_1",
     todos: [
       {
         name: "Get broom and dustpan",
@@ -165,8 +223,9 @@ const CHORES: Chore[] = [
     description: "Wash and dry all dishes in the sink.",
     time: "30m",
     icon: "droplets",
-    user_email: LOGGED_IN_USER_EMAIL,
+    user_email: DEFAULT_USER_EMAIL,
     status: "claimed",
+    homeID: "home_1",
     todos: [
       {
         name: "Scrape plates",
@@ -186,8 +245,9 @@ const CHORES: Chore[] = [
     description: "Vacuum the entire house.",
     time: "45m",
     icon: "wind",
-    user_email: LOGGED_IN_USER_EMAIL,
+    user_email: DEFAULT_USER_EMAIL,
     status: "complete",
+    homeID: "home_2",
     todos: [
       {
         name: "Clear the floor",
@@ -209,8 +269,9 @@ const CHORES: Chore[] = [
     description: "Wash, dry, and fold one load of laundry.",
     time: "2h",
     icon: "shirt",
-    user_email: LOGGED_IN_USER_EMAIL,
+    user_email: DEFAULT_USER_EMAIL,
     status: "complete",
+    homeID: "home_2",
     todos: [
       {
         name: "Sort clothes",
@@ -232,14 +293,35 @@ const CHORES: Chore[] = [
   },
 ];
 
+// User authentication functions
+export const loginUserAPI = (email: string): User | null => {
+  return USERS.find((user) => user.email === email) || null;
+};
+
+export const getUserByEmailAPI = (email: string): User | null => {
+  return USERS.find((user) => user.email === email) || null;
+};
+
+export const getHomeByIdAPI = (homeId: string): Home | null => {
+  return HOMES.find((home) => home.id === homeId) || null;
+};
+
+export const getUserHomesAPI = (email: string): Home[] => {
+  const user = getUserByEmailAPI(email);
+  if (!user) return [];
+  return HOMES.filter((home) => user.homeIDs.includes(home.id));
+};
+
 export const createChoreAPI = (
-  choreData: Omit<Chore, "uuid" | "status" | "user_email" | "todos">
+  choreData: Omit<Chore, "uuid" | "status" | "user_email" | "todos" | "homeID">,
+  homeID: string
 ) => {
   const newChore: Chore = {
     ...choreData,
     uuid: uuidv4(),
     user_email: null,
     status: "unapproved",
+    homeID,
     todos: [
       { name: "Item 1", description: "Detailed description for item 1." },
       { name: "Item 2", description: "Detailed description for item 2." },
@@ -251,16 +333,21 @@ export const createChoreAPI = (
   return newChore;
 };
 
-export const getMyChoresAPI = (): Chore[] => {
+export const getMyChoresAPI = (email: string, homeID: string): Chore[] => {
   return CHORES.filter(
     (chore) =>
-      chore.user_email === LOGGED_IN_USER_EMAIL && chore.status === "claimed"
+      chore.user_email === email &&
+      chore.status === "claimed" &&
+      chore.homeID === homeID
   );
 };
 
-export const getAvailableChoresAPI = (): Chore[] => {
+export const getAvailableChoresAPI = (homeID: string): Chore[] => {
   return CHORES.filter(
-    (chore) => chore.user_email === null && chore.status === "unclaimed"
+    (chore) =>
+      chore.user_email === null &&
+      chore.status === "unclaimed" &&
+      chore.homeID === homeID
   );
 };
 
@@ -268,8 +355,10 @@ export const getChoreByIdAPI = (uuid: string): Chore | undefined => {
   return CHORES.find((chore) => chore.uuid === uuid);
 };
 
-export const getUnapprovedChoresAPI = (): Chore[] => {
-  return CHORES.filter((chore) => chore.status === "unapproved");
+export const getUnapprovedChoresAPI = (homeID: string): Chore[] => {
+  return CHORES.filter(
+    (chore) => chore.status === "unapproved" && chore.homeID === homeID
+  );
 };
 
 export const approveChoreAPI = (uuid: string): void => {
@@ -279,10 +368,7 @@ export const approveChoreAPI = (uuid: string): void => {
   }
 };
 
-export const claimChoreAPI = (
-  uuid: string,
-  email: string = LOGGED_IN_USER_EMAIL
-): void => {
+export const claimChoreAPI = (uuid: string, email: string): void => {
   const chore = CHORES.find((chore) => chore.uuid === uuid);
   if (chore && chore.status === "unclaimed") {
     chore.user_email = email;
