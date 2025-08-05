@@ -222,6 +222,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 20,
+    paddingTop: 60,
     justifyContent: "center",
   },
   header: {
@@ -229,7 +230,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   title: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 10,
