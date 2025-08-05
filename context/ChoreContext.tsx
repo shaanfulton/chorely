@@ -4,11 +4,15 @@ import {
   claimChoreAPI,
   completeChoreAPI,
   createChoreAPI,
+  createHomeAPI,
+  createUserAPI,
   getAvailableChoresAPI,
+  getHomeByIdAPI,
   getMyChoresAPI,
   getUnapprovedChoresAPI,
   getUserHomesAPI,
   Home,
+  joinHomeAPI,
   loginUserAPI,
   User,
 } from "@/data/mock";
@@ -97,7 +101,10 @@ interface GlobalChoreContextType {
 
   // User Actions
   loginUser: (email: string) => Promise<boolean>;
+  signupUser: (email: string, homeId?: string) => Promise<boolean>;
   switchHome: (homeId: string) => Promise<void>;
+  createHome: (name: string, address: string) => Promise<Home>;
+  joinHome: (homeId: string) => Promise<boolean>;
 
   // Chore Actions
   claimChore: (choreUuid: string) => Promise<void>;
@@ -133,7 +140,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
   const [pendingApprovalChores, setPendingApprovalChores] = useState<Chore[]>(
     []
   );
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -164,6 +171,40 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
       return false;
     }
   }, []);
+
+  // Signup user
+  const signupUser = useCallback(
+    async (email: string, homeId?: string): Promise<boolean> => {
+      try {
+        setError(null);
+        const user = createUserAPI(email, homeId);
+
+        setCurrentUser(user);
+
+        // Get user's homes
+        const homes = getUserHomesAPI(email);
+        setUserHomes(homes);
+
+        // Set the home as current if provided, otherwise set first available
+        if (homeId) {
+          const selectedHome = getHomeByIdAPI(homeId);
+          if (selectedHome) {
+            setCurrentHome(selectedHome);
+          }
+        } else if (homes.length > 0) {
+          setCurrentHome(homes[0]);
+        }
+
+        return true;
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to create account"
+        );
+        return false;
+      }
+    },
+    []
+  );
 
   // Switch home
   const switchHome = useCallback(
@@ -196,18 +237,18 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
     }
   }, [currentUser, currentHome]);
 
-  // Auto-login with default user on mount
-  useEffect(() => {
-    const initializeUser = async () => {
-      setIsLoading(true);
-      const loginSuccess = await loginUser("user@example.com");
-      if (loginSuccess) {
-        // fetchAllData will be called automatically due to currentUser/currentHome change
-      }
-      setIsLoading(false);
-    };
-    initializeUser();
-  }, [loginUser]);
+  // Auto-login with default user on mount (disabled for authentication flow)
+  // useEffect(() => {
+  //   const initializeUser = async () => {
+  //     setIsLoading(true);
+  //     const loginSuccess = await loginUser("user@example.com");
+  //     if (loginSuccess) {
+  //       // fetchAllData will be called automatically due to currentUser/currentHome change
+  //     }
+  //     setIsLoading(false);
+  //   };
+  //   initializeUser();
+  // }, [loginUser]);
 
   // Fetch data when user or home changes
   useEffect(() => {
@@ -374,6 +415,78 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
     [pendingApprovalChores, currentHome]
   );
 
+  // Create home
+  const createHome = useCallback(
+    async (name: string, address: string): Promise<Home> => {
+      if (!currentUser) {
+        throw new Error("User must be logged in to create a home");
+      }
+
+      try {
+        setError(null);
+        const newHome = createHomeAPI(name, address);
+
+        // Join the newly created home
+        const joinSuccess = joinHomeAPI(currentUser.email, newHome.id);
+        if (!joinSuccess) {
+          throw new Error("Failed to join the newly created home");
+        }
+
+        // Update user homes
+        const updatedHomes = getUserHomesAPI(currentUser.email);
+        setUserHomes(updatedHomes);
+
+        // Set the new home as current
+        setCurrentHome(newHome);
+
+        return newHome;
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to create home";
+        setError(errorMessage);
+        throw new Error(errorMessage);
+      }
+    },
+    [currentUser]
+  );
+
+  // Join existing home
+  const joinHome = useCallback(
+    async (homeId: string): Promise<boolean> => {
+      if (!currentUser) {
+        throw new Error("User must be logged in to join a home");
+      }
+
+      try {
+        setError(null);
+        const success = joinHomeAPI(currentUser.email, homeId);
+
+        if (!success) {
+          setError("Failed to join home. Home may not exist.");
+          return false;
+        }
+
+        // Update user homes
+        const updatedHomes = getUserHomesAPI(currentUser.email);
+        setUserHomes(updatedHomes);
+
+        // Set the joined home as current
+        const joinedHome = getHomeByIdAPI(homeId);
+        if (joinedHome) {
+          setCurrentHome(joinedHome);
+        }
+
+        return true;
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to join home";
+        setError(errorMessage);
+        return false;
+      }
+    },
+    [currentUser]
+  );
+
   const clearError = useCallback(() => {
     setError(null);
   }, []);
@@ -394,7 +507,10 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
 
     // User actions
     loginUser,
+    signupUser,
     switchHome,
+    createHome,
+    joinHome,
 
     // Chore actions
     claimChore,

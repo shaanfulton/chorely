@@ -306,10 +306,57 @@ export const getHomeByIdAPI = (homeId: string): Home | null => {
   return HOMES.find((home) => home.id === homeId) || null;
 };
 
+export const getAllHomesAPI = (): Home[] => {
+  return HOMES;
+};
+
 export const getUserHomesAPI = (email: string): Home[] => {
   const user = getUserByEmailAPI(email);
   if (!user) return [];
   return HOMES.filter((home) => user.homeIDs.includes(home.id));
+};
+
+export const createUserAPI = (email: string, homeId?: string): User => {
+  // Check if user already exists
+  const existingUser = getUserByEmailAPI(email);
+  if (existingUser) {
+    throw new Error("User already exists");
+  }
+
+  // Create new user
+  const newUser: User = {
+    email,
+    homeIDs: homeId ? [homeId] : [],
+  };
+
+  USERS.push(newUser);
+  return newUser;
+};
+
+export const createHomeAPI = (name: string, address: string): Home => {
+  const newHome: Home = {
+    id: `home_${Date.now()}`, // Simple ID generation for mock
+    name,
+    address,
+  };
+
+  HOMES.push(newHome);
+  return newHome;
+};
+
+export const joinHomeAPI = (email: string, homeId: string): boolean => {
+  const user = getUserByEmailAPI(email);
+  const home = getHomeByIdAPI(homeId);
+
+  if (!user || !home) {
+    return false;
+  }
+
+  if (!user.homeIDs.includes(homeId)) {
+    user.homeIDs.push(homeId);
+  }
+
+  return true;
 };
 
 export const createChoreAPI = (
