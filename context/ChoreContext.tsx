@@ -6,14 +6,17 @@ import {
   createChoreAPI,
   createHomeAPI,
   createUserAPI,
+  getAllUserPointsAPI,
   getAvailableChoresAPI,
   getHomeByIdAPI,
   getMyChoresAPI,
   getUnapprovedChoresAPI,
   getUserHomesAPI,
+  getUserPointsAPI,
   Home,
   joinHomeAPI,
   loginUserAPI,
+  updateUserPointsAPI,
   User,
 } from "@/data/mock";
 import React, {
@@ -99,11 +102,19 @@ interface GlobalChoreContextType {
   isRefreshing: boolean;
   error: string | null;
 
+  // Points State
+  userPoints: number;
+  allUserPoints: { [userEmail: string]: number };
+
   // User Actions
   loginUser: (email: string) => Promise<boolean>;
   signupUser: (email: string, homeId?: string) => Promise<boolean>;
   switchHome: (homeId: string) => Promise<void>;
-  createHome: (name: string, address: string) => Promise<Home>;
+  createHome: (
+    name: string,
+    address: string,
+    weeklyPointQuota?: number
+  ) => Promise<Home>;
   joinHome: (homeId: string) => Promise<boolean>;
 
   // Chore Actions
@@ -118,6 +129,10 @@ interface GlobalChoreContextType {
   ) => Promise<Chore>;
   refreshAllData: () => Promise<void>;
   clearError: () => void;
+
+  // Points Actions
+  getUserPoints: (userEmail?: string) => number;
+  refreshPoints: () => Promise<void>;
 }
 
 const GlobalChoreContext = createContext<GlobalChoreContextType | undefined>(
@@ -143,6 +158,12 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Points state
+  const [userPoints, setUserPoints] = useState<number>(0);
+  const [allUserPoints, setAllUserPoints] = useState<{
+    [userEmail: string]: number;
+  }>({});
 
   // Login user and set up initial state
   const loginUser = useCallback(async (email: string): Promise<boolean> => {
@@ -232,6 +253,15 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
       setAvailableChores(available);
       setMyChores(my);
       setPendingApprovalChores(pending);
+
+      // Fetch points data
+      const currentUserPoints = getUserPointsAPI(
+        currentUser.email,
+        currentHome.id
+      );
+      const allPoints = getAllUserPointsAPI(currentHome.id);
+      setUserPoints(currentUserPoints);
+      setAllUserPoints(allPoints);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch chores");
     }
@@ -305,24 +335,39 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
   const completeChore = useCallback(
     async (choreUuid: string) => {
       const choreToUpdate = myChores.find((chore) => chore.uuid === choreUuid);
-      if (!choreToUpdate) return;
+      if (!choreToUpdate || !currentUser || !currentHome) return;
 
-      // Optimistic update - remove from myChores list
+      // Optimistic update - remove from myChores list and add points
       const updatedMy = myChores.filter((chore) => chore.uuid !== choreUuid);
+      const newUserPoints = userPoints + choreToUpdate.points;
+      const updatedAllPoints = {
+        ...allUserPoints,
+        [currentUser.email]: newUserPoints,
+      };
+
       setMyChores(updatedMy);
+      setUserPoints(newUserPoints);
+      setAllUserPoints(updatedAllPoints);
 
       try {
-        // Make API call
+        // Make API calls
         completeChoreAPI(choreUuid);
+        updateUserPointsAPI(
+          currentUser.email,
+          currentHome.id,
+          choreToUpdate.points
+        );
       } catch (err) {
         // Rollback on error
         setMyChores(myChores);
+        setUserPoints(userPoints);
+        setAllUserPoints(allUserPoints);
         setError(
           err instanceof Error ? err.message : "Failed to complete chore"
         );
       }
     },
-    [myChores]
+    [myChores, currentUser, currentHome, userPoints, allUserPoints]
   );
 
   // Approve chore with optimistic updates
@@ -381,6 +426,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
         user_email: null,
         status: "unapproved",
         homeID: currentHome.id,
+        points: choreData.points || 10, // Default to 10 points if not specified
         todos: [
           { name: "Item 1", description: "Detailed description for item 1." },
           { name: "Item 2", description: "Detailed description for item 2." },
@@ -417,14 +463,18 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
 
   // Create home
   const createHome = useCallback(
-    async (name: string, address: string): Promise<Home> => {
+    async (
+      name: string,
+      address: string,
+      weeklyPointQuota?: number
+    ): Promise<Home> => {
       if (!currentUser) {
         throw new Error("User must be logged in to create a home");
       }
 
       try {
         setError(null);
-        const newHome = createHomeAPI(name, address);
+        const newHome = createHomeAPI(name, address, weeklyPointQuota);
 
         // Join the newly created home
         const joinSuccess = joinHomeAPI(currentUser.email, newHome.id);
@@ -491,6 +541,32 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
     setError(null);
   }, []);
 
+  // Points actions
+  const getUserPoints = useCallback(
+    (userEmail?: string): number => {
+      if (!currentHome) return 0;
+      const email = userEmail || currentUser?.email;
+      if (!email) return 0;
+      return allUserPoints[email] || 0;
+    },
+    [currentHome, currentUser, allUserPoints]
+  );
+
+  const refreshPoints = useCallback(async () => {
+    if (!currentUser || !currentHome) return;
+    try {
+      const currentUserPoints = getUserPointsAPI(
+        currentUser.email,
+        currentHome.id
+      );
+      const allPoints = getAllUserPointsAPI(currentHome.id);
+      setUserPoints(currentUserPoints);
+      setAllUserPoints(allPoints);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch points");
+    }
+  }, [currentUser, currentHome]);
+
   const value: GlobalChoreContextType = {
     // User state
     currentUser,
@@ -504,6 +580,10 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
     isLoading,
     isRefreshing,
     error,
+
+    // Points State
+    userPoints,
+    allUserPoints,
 
     // User actions
     loginUser,
@@ -519,6 +599,10 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
     createChore,
     refreshAllData,
     clearError,
+
+    // Points Actions
+    getUserPoints,
+    refreshPoints,
   };
 
   return (

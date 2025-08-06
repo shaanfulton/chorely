@@ -1,16 +1,16 @@
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import { useGlobalChores } from "@/context/ChoreContext";
 import React from "react";
 import { StyleSheet, View } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 
-const exampleData = {
-  points: 55,
-  totalPoints: 100,
-};
-
 export function PointsDashboard() {
-  const { points, totalPoints } = exampleData;
+  const { userPoints, currentHome } = useGlobalChores();
+
+  // Use the current home's weekly point quota as the denominator
+  const totalPoints = currentHome?.weeklyPointQuota || 100;
+  const points = userPoints;
   const percentage = (points / totalPoints) * 100;
   const strokeDashoffset = 251.2 - (251.2 * percentage) / 100; // 2 * PI * 40
 

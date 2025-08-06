@@ -13,9 +13,14 @@ import {
 interface ChecklistProps {
   items: TodoItem[];
   onItemPress: (item: TodoItem) => void;
+  disabled?: boolean;
 }
 
-export function Checklist({ items, onItemPress }: ChecklistProps) {
+export function Checklist({
+  items,
+  onItemPress,
+  disabled = false,
+}: ChecklistProps) {
   const { completedItems, toggleItem } = useChecklist();
 
   return (
@@ -27,8 +32,10 @@ export function Checklist({ items, onItemPress }: ChecklistProps) {
               style={[
                 styles.checkbox,
                 completedItems.has(item.name) && styles.checked,
+                disabled && styles.disabled,
               ]}
-              onPress={() => toggleItem(item.name)}
+              onPress={disabled ? undefined : () => toggleItem(item.name)}
+              disabled={disabled}
             >
               {completedItems.has(item.name) && (
                 <Text style={styles.checkmark}>✓</Text>
@@ -73,6 +80,10 @@ const styles = StyleSheet.create({
   checkmark: {
     color: "white",
     fontSize: 12,
+  },
+  disabled: {
+    opacity: 0.5,
+    borderColor: "#ddd",
   },
   itemText: {
     fontSize: 16,

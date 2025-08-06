@@ -20,10 +20,11 @@ import { StyleSheet, View } from "react-native";
 function ChoreViewContent({ chore }: { chore: Chore }) {
   const [selectedItem, setSelectedItem] = useState<TodoItem | null>(null);
   const { isAllCompleted, resetCompleted } = useChecklist();
-  const { claimChore } = useGlobalChores();
+  const { claimChore, approveChore } = useGlobalChores();
   const router = useRouter();
   const currentUserEmail = getCurrentUserEmail();
   const [isClaimingChore, setIsClaimingChore] = useState(false);
+  const [isApprovingChore, setIsApprovingChore] = useState(false);
   const [isNavigatingToValidation, setIsNavigatingToValidation] =
     useState(false);
 
@@ -57,8 +58,35 @@ function ChoreViewContent({ chore }: { chore: Chore }) {
     }
   };
 
+  const handleApproveChore = async () => {
+    try {
+      setIsApprovingChore(true);
+      await approveChore(chore.uuid);
+      // Navigate back to home after approval
+      router.push("/");
+    } catch (error) {
+      console.error("Failed to approve chore:", error);
+    } finally {
+      setIsApprovingChore(false);
+    }
+  };
+
   // Determine what to render based on chore ownership and status
   const getButtonContent = () => {
+    // If chore is unapproved - show approve button
+    if (chore.status === "unapproved") {
+      return (
+        <Button
+          title="Approve"
+          backgroundColor={Colors.metro.green}
+          loadingBackgroundColor={Colors.metro.teal}
+          isLoading={isApprovingChore}
+          onPress={handleApproveChore}
+          size="medium"
+        />
+      );
+    }
+
     // If chore is claimed and owned by current user - show validate button (only if tasks completed)
     if (chore.status === "claimed" && chore.user_email === currentUserEmail) {
       if (!allTasksCompleted) {
@@ -106,7 +134,7 @@ function ChoreViewContent({ chore }: { chore: Chore }) {
       );
     }
 
-    // Default case - show info message (for unapproved chores, etc.)
+    // Default case - show info message
     return (
       <ThemedView style={styles.infoContainer}>
         <ThemedText style={styles.infoText}>Chore Not Available</ThemedText>
@@ -118,7 +146,13 @@ function ChoreViewContent({ chore }: { chore: Chore }) {
     <ThemedView style={styles.container}>
       <IconComponent size={64} color="#666" />
       <ThemedText style={styles.title}>{chore.name}</ThemedText>
-      <Checklist items={chore.todos} onItemPress={setSelectedItem} />
+      <Checklist
+        items={chore.todos}
+        onItemPress={setSelectedItem}
+        disabled={
+          chore.status !== "claimed" || chore.user_email !== currentUserEmail
+        }
+      />
       {selectedItem && (
         <CenterModal
           visible={!!selectedItem}

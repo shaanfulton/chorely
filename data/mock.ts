@@ -17,6 +17,8 @@ export interface Home {
   id: string;
   name: string;
   address: string;
+  userPoints: { [userEmail: string]: number };
+  weeklyPointQuota: number;
 }
 
 export interface Chore {
@@ -29,6 +31,7 @@ export interface Chore {
   status: ChoreStatus;
   todos: TodoItem[];
   homeID: string;
+  points: number;
 }
 
 // Mock data for homes
@@ -37,16 +40,30 @@ const HOMES: Home[] = [
     id: "home_1",
     name: "Main House",
     address: "123 Main St, Berkeley, CA",
+    userPoints: {
+      "user@example.com": 85,
+      "roommate@example.com": 42,
+    },
+    weeklyPointQuota: 100,
   },
   {
     id: "home_2",
     name: "Summer Cabin",
     address: "456 Lake View Dr, Tahoe, CA",
+    userPoints: {
+      "user@example.com": 120,
+      "family@example.com": 95,
+    },
+    weeklyPointQuota: 150,
   },
   {
     id: "home_3",
     name: "Downtown Apartment",
     address: "789 Market St, San Francisco, CA",
+    userPoints: {
+      "family@example.com": 73,
+    },
+    weeklyPointQuota: 80,
   },
 ];
 
@@ -91,6 +108,7 @@ const CHORES: Chore[] = [
       { name: "Step 1", description: "Detailed description for step 1." },
       { name: "Step 2", description: "Detailed description for step 2." },
     ],
+    points: 10,
   },
   {
     uuid: uuidv4(),
@@ -119,6 +137,7 @@ const CHORES: Chore[] = [
         description: "Place items back on the shelves in an organized manner.",
       },
     ],
+    points: 10,
   },
   {
     uuid: uuidv4(),
@@ -140,6 +159,7 @@ const CHORES: Chore[] = [
         description: "Dust tables, shelves, and other furniture.",
       },
     ],
+    points: 10,
   },
   {
     uuid: uuidv4(),
@@ -168,6 +188,7 @@ const CHORES: Chore[] = [
         description: "Allow the floor to air dry completely.",
       },
     ],
+    points: 10,
   },
   {
     uuid: uuidv4(),
@@ -192,6 +213,7 @@ const CHORES: Chore[] = [
         description: "Take the main trash bag to the outdoor bin/curb.",
       },
     ],
+    points: 10,
   },
   {
     uuid: uuidv4(),
@@ -216,6 +238,7 @@ const CHORES: Chore[] = [
         description: "Use the dustpan to collect and throw away the pile.",
       },
     ],
+    points: 10,
   },
   {
     uuid: uuidv4(),
@@ -238,6 +261,7 @@ const CHORES: Chore[] = [
       { name: "Rinse thoroughly", description: "Rinse off all soap suds." },
       { name: "Dry and put away", description: "Use a towel or drying rack." },
     ],
+    points: 10,
   },
   {
     uuid: uuidv4(),
@@ -262,6 +286,7 @@ const CHORES: Chore[] = [
         description: "Use attachments for corners and edges.",
       },
     ],
+    points: 10,
   },
   {
     uuid: uuidv4(),
@@ -290,6 +315,7 @@ const CHORES: Chore[] = [
         description: "Fold the dry clothes and put them away.",
       },
     ],
+    points: 10,
   },
 ];
 
@@ -333,11 +359,17 @@ export const createUserAPI = (email: string, homeId?: string): User => {
   return newUser;
 };
 
-export const createHomeAPI = (name: string, address: string): Home => {
+export const createHomeAPI = (
+  name: string,
+  address: string,
+  weeklyPointQuota: number = 100
+): Home => {
   const newHome: Home = {
     id: `home_${Date.now()}`, // Simple ID generation for mock
     name,
     address,
+    userPoints: {},
+    weeklyPointQuota,
   };
 
   HOMES.push(newHome);
@@ -369,6 +401,7 @@ export const createChoreAPI = (
     user_email: null,
     status: "unapproved",
     homeID,
+    points: choreData.points || 10, // Default to 10 points if not specified
     todos: [
       { name: "Item 1", description: "Detailed description for item 1." },
       { name: "Item 2", description: "Detailed description for item 2." },
@@ -435,4 +468,33 @@ export const verifyChoreAPI = (uuid: string): void => {
   if (chore) {
     chore.status = "complete";
   }
+};
+
+// Points-related API functions
+export const getUserPointsAPI = (userEmail: string, homeID: string): number => {
+  const home = HOMES.find((home) => home.id === homeID);
+  if (!home) return 0;
+  return home.userPoints[userEmail] || 0;
+};
+
+export const updateUserPointsAPI = (
+  userEmail: string,
+  homeID: string,
+  points: number
+): void => {
+  const home = HOMES.find((home) => home.id === homeID);
+  if (home) {
+    if (!home.userPoints[userEmail]) {
+      home.userPoints[userEmail] = 0;
+    }
+    home.userPoints[userEmail] += points;
+  }
+};
+
+export const getAllUserPointsAPI = (
+  homeID: string
+): { [userEmail: string]: number } => {
+  const home = HOMES.find((home) => home.id === homeID);
+  if (!home) return {};
+  return home.userPoints;
 };

@@ -1,7 +1,8 @@
 import { Chore } from "@/data/mock";
 import { getLucideIcon } from "@/utils/iconUtils";
+import { Link } from "expo-router";
 import React from "react";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { ThemedText } from "./ThemedText";
 
 interface ApprovalListItemProps {
@@ -17,13 +18,21 @@ export const ApprovalListItem: React.FC<ApprovalListItemProps> = ({
 
   return (
     <View style={styles.container}>
-      <View style={styles.choreInfo}>
-        <View style={styles.iconContainer}>{Icon && <Icon />}</View>
-        <View>
-          <ThemedText type="defaultSemiBold">{chore.name}</ThemedText>
-          <ThemedText type="default">{chore.time}</ThemedText>
-        </View>
-      </View>
+      <Link
+        href={{
+          pathname: "/chore-view",
+          params: { uuid: chore.uuid },
+        }}
+        asChild
+      >
+        <Pressable style={styles.choreInfo}>
+          <View style={styles.iconContainer}>{Icon && <Icon />}</View>
+          <View>
+            <ThemedText type="defaultSemiBold">{chore.name}</ThemedText>
+            <ThemedText type="default">{chore.time}</ThemedText>
+          </View>
+        </Pressable>
+      </Link>
       <View style={styles.buttonContainer}>{children}</View>
     </View>
   );
