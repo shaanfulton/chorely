@@ -1,8 +1,8 @@
 import { ThemedText } from "@/components/ThemedText";
-import { CreateHomeForm } from "@/components/settings/CreateHomeForm";
-import { JoinHomeForm } from "@/components/settings/JoinHomeForm";
+import { router } from "expo-router";
+import { Plus, Users } from "lucide-react-native";
 import React from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
 
 interface HomeManagementProps {
   isLoading: boolean;
@@ -13,12 +13,37 @@ export function HomeManagement({
   isLoading,
   setIsLoading,
 }: HomeManagementProps) {
+  const handleCreateHome = () => {
+    router.push("/create-home");
+  };
+
+  const handleJoinHome = () => {
+    router.push("/join-home");
+  };
+
   return (
     <View style={styles.section}>
-      <ThemedText style={styles.sectionTitle}>Home Management</ThemedText>
+      <ThemedText style={styles.sectionTitle}>Add a Home</ThemedText>
 
-      <JoinHomeForm isLoading={isLoading} setIsLoading={setIsLoading} />
-      <CreateHomeForm isLoading={isLoading} setIsLoading={setIsLoading} />
+      <View style={styles.linkContainer}>
+        <TouchableOpacity
+          style={styles.linkButton}
+          onPress={handleJoinHome}
+          disabled={isLoading}
+        >
+          <Users size={20} color="#007AFF" style={styles.linkIcon} />
+          <ThemedText style={styles.linkText}>Join Existing Home</ThemedText>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.linkButton}
+          onPress={handleCreateHome}
+          disabled={isLoading}
+        >
+          <Plus size={20} color="#007AFF" style={styles.linkIcon} />
+          <ThemedText style={styles.linkText}>Create New Home</ThemedText>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -30,6 +55,23 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    marginBottom: 8,
+    marginBottom: 16,
+  },
+  linkContainer: {
+    gap: 12,
+  },
+  linkButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 0,
+  },
+  linkIcon: {
+    marginRight: 12,
+  },
+  linkText: {
+    fontSize: 16,
+    color: "#007AFF",
+    fontWeight: "500",
   },
 });

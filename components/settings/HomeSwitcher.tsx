@@ -1,5 +1,7 @@
 import { ThemedText } from "@/components/ThemedText";
 import { useGlobalChores } from "@/context/ChoreContext";
+import { useRouter } from "expo-router";
+import { MoreHorizontal } from "lucide-react-native";
 import React from "react";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
@@ -10,6 +12,7 @@ interface HomeSwitcherProps {
 
 export function HomeSwitcher({ isLoading, setIsLoading }: HomeSwitcherProps) {
   const { currentHome, userHomes, switchHome } = useGlobalChores();
+  const router = useRouter();
 
   const handleSwitchHome = async (homeId: string) => {
     if (homeId === currentHome?.id) return;
@@ -25,12 +28,17 @@ export function HomeSwitcher({ isLoading, setIsLoading }: HomeSwitcherProps) {
     }
   };
 
+  const handleHomeSettings = (homeId: string) => {
+    router.push({
+      pathname: "/home-settings",
+      params: { homeId },
+    });
+  };
+
   return (
     <View style={styles.section}>
       <ThemedText style={styles.sectionTitle}>Switch Home</ThemedText>
-      <Text style={styles.sectionDescription}>
-        Select which home to use for chores and points
-      </Text>
+      <Text style={styles.sectionDescription}>Select your current home.</Text>
       <View style={styles.homesList}>
         {userHomes.map((home) => (
           <TouchableOpacity
@@ -43,18 +51,28 @@ export function HomeSwitcher({ isLoading, setIsLoading }: HomeSwitcherProps) {
             disabled={isLoading || currentHome?.id === home.id}
           >
             <View style={styles.homeOptionContent}>
-              <Text
-                style={[
-                  styles.homeOptionName,
-                  currentHome?.id === home.id && styles.homeOptionNameSelected,
-                ]}
+              <View style={styles.homeInfo}>
+                <Text
+                  style={[
+                    styles.homeOptionName,
+                    currentHome?.id === home.id &&
+                      styles.homeOptionNameSelected,
+                  ]}
+                >
+                  {home.name}
+                </Text>
+                <Text style={styles.homeOptionAddress}>{home.address}</Text>
+                {currentHome?.id === home.id && (
+                  <Text style={styles.currentLabel}>Current</Text>
+                )}
+              </View>
+              <TouchableOpacity
+                style={styles.settingsButton}
+                onPress={() => handleHomeSettings(home.id)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                {home.name}
-              </Text>
-              <Text style={styles.homeOptionAddress}>{home.address}</Text>
-              {currentHome?.id === home.id && (
-                <Text style={styles.currentLabel}>Current</Text>
-              )}
+                <MoreHorizontal size={20} color="#666" />
+              </TouchableOpacity>
             </View>
           </TouchableOpacity>
         ))}
@@ -92,7 +110,16 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 122, 255, 0.05)",
   },
   homeOptionContent: {
-    flexDirection: "column",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  homeInfo: {
+    flex: 1,
+  },
+  settingsButton: {
+    padding: 8,
+    marginLeft: 12,
   },
   homeOptionName: {
     fontSize: 16,

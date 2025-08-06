@@ -15,7 +15,9 @@ import {
   getUserPointsAPI,
   Home,
   joinHomeAPI,
+  leaveHomeAPI,
   loginUserAPI,
+  updateHomeWeeklyQuotaAPI,
   updateUserPointsAPI,
   User,
 } from "@/data/mock";
@@ -121,6 +123,11 @@ interface GlobalChoreContextType {
     weeklyPointQuota?: number
   ) => Promise<Home>;
   joinHome: (homeId: string) => Promise<boolean>;
+  updateHomeWeeklyQuota: (
+    homeId: string,
+    weeklyPointQuota: number
+  ) => Promise<boolean>;
+  leaveHome: (homeId: string) => Promise<boolean>;
 
   // Chore Actions
   claimChore: (choreUuid: string) => Promise<void>;
@@ -585,6 +592,86 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
     }
   }, [currentUser, currentHome]);
 
+  // Update home weekly quota
+  const updateHomeWeeklyQuota = useCallback(
+    async (homeId: string, weeklyPointQuota: number): Promise<boolean> => {
+      try {
+        setError(null);
+        const success = updateHomeWeeklyQuotaAPI(homeId, weeklyPointQuota);
+
+        if (!success) {
+          setError("Failed to update weekly quota. Home may not exist.");
+          return false;
+        }
+
+        // Update the home in userHomes if it's in the list
+        const updatedHomes = userHomes.map((home) =>
+          home.id === homeId ? { ...home, weeklyPointQuota } : home
+        );
+        setUserHomes(updatedHomes);
+
+        // Update current home if it's the one being updated
+        if (currentHome?.id === homeId) {
+          setCurrentHome({ ...currentHome, weeklyPointQuota });
+        }
+
+        return true;
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to update weekly quota";
+        setError(errorMessage);
+        return false;
+      }
+    },
+    [userHomes, currentHome]
+  );
+
+  // Leave home
+  const leaveHome = useCallback(
+    async (homeId: string): Promise<boolean> => {
+      if (!currentUser) {
+        throw new Error("User must be logged in to leave a home");
+      }
+
+      try {
+        setError(null);
+        const success = leaveHomeAPI(currentUser.email, homeId);
+
+        if (!success) {
+          setError("Failed to leave home. Home may not exist.");
+          return false;
+        }
+
+        // Update user homes by removing the left home
+        const updatedHomes = getUserHomesAPI(currentUser.email);
+        setUserHomes(updatedHomes);
+
+        // If the user left their current home, switch to the first available home
+        if (currentHome?.id === homeId) {
+          if (updatedHomes.length > 0) {
+            setCurrentHome(updatedHomes[0]);
+          } else {
+            setCurrentHome(null);
+            // Clear all data if no homes left
+            setAvailableChores([]);
+            setMyChores([]);
+            setPendingApprovalChores([]);
+            setUserPoints(0);
+            setAllUserPoints({});
+          }
+        }
+
+        return true;
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to leave home";
+        setError(errorMessage);
+        return false;
+      }
+    },
+    [currentUser, currentHome]
+  );
+
   const value: GlobalChoreContextType = {
     // User state
     currentUser,
@@ -610,6 +697,8 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
     switchHome,
     createHome,
     joinHome,
+    updateHomeWeeklyQuota,
+    leaveHome,
 
     // Chore actions
     claimChore,

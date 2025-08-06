@@ -507,3 +507,32 @@ export const getAllUserPointsAPI = (
   if (!home) return {};
   return home.userPoints;
 };
+
+// Home management API functions
+export const updateHomeWeeklyQuotaAPI = (
+  homeId: string,
+  weeklyPointQuota: number
+): boolean => {
+  const home = HOMES.find((home) => home.id === homeId);
+  if (!home) return false;
+
+  home.weeklyPointQuota = weeklyPointQuota;
+  return true;
+};
+
+export const leaveHomeAPI = (userEmail: string, homeId: string): boolean => {
+  const user = getUserByEmailAPI(userEmail);
+  const home = getHomeByIdAPI(homeId);
+
+  if (!user || !home) return false;
+
+  // Remove home from user's homeIDs
+  user.homeIDs = user.homeIDs.filter((id) => id !== homeId);
+
+  // Remove user's points from home
+  if (home.userPoints[userEmail]) {
+    delete home.userPoints[userEmail];
+  }
+
+  return true;
+};

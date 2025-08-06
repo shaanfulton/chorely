@@ -105,6 +105,42 @@ export default function RootLayout() {
                   },
                 }}
               />
+              <Stack.Screen
+                name="create-home"
+                options={{
+                  title: "Create Home",
+                  headerBackTitle: "Back",
+                  headerBackButtonDisplayMode: "minimal",
+                  headerTitleStyle: {
+                    fontSize: 20,
+                    fontWeight: "600",
+                  },
+                }}
+              />
+              <Stack.Screen
+                name="join-home"
+                options={{
+                  title: "Join Home",
+                  headerBackTitle: "Back",
+                  headerBackButtonDisplayMode: "minimal",
+                  headerTitleStyle: {
+                    fontSize: 20,
+                    fontWeight: "600",
+                  },
+                }}
+              />
+              <Stack.Screen
+                name="home-settings"
+                options={{
+                  title: "Home Settings",
+                  headerBackTitle: "Back",
+                  headerBackButtonDisplayMode: "minimal",
+                  headerTitleStyle: {
+                    fontSize: 20,
+                    fontWeight: "600",
+                  },
+                }}
+              />
               <Stack.Screen name="+not-found" />
             </Stack>
             <StatusBar style="dark" />
