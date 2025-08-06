@@ -41,7 +41,7 @@ const HOMES: Home[] = [
     name: "Main House",
     address: "123 Main St, Berkeley, CA",
     userPoints: {
-      "user@example.com": 85,
+      "user@example.com": 15,
       "roommate@example.com": 42,
     },
     weeklyPointQuota: 100,

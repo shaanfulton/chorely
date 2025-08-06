@@ -1,5 +1,6 @@
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import { Colors } from "@/constants/Colors";
 import { useGlobalChores } from "@/context/ChoreContext";
 import React from "react";
 import { StyleSheet, View } from "react-native";
@@ -11,8 +12,21 @@ export function PointsDashboard() {
   // Use the current home's weekly point quota as the denominator
   const totalPoints = currentHome?.weeklyPointQuota || 100;
   const points = userPoints;
-  const percentage = (points / totalPoints) * 100;
+  const percentage = Math.min((points / totalPoints) * 100, 100); // Cap at 100%
   const strokeDashoffset = 251.2 - (251.2 * percentage) / 100; // 2 * PI * 40
+
+  // Determine color based on progress
+  const getProgressColor = () => {
+    if (percentage >= 100) {
+      return Colors.metro.green; // Green for 100%
+    } else if (percentage >= 33.33) {
+      return Colors.metro.yellow; // Yellow for 33%-99%
+    } else {
+      return Colors.metro.red; // Red for under 33%
+    }
+  };
+
+  const progressColor = getProgressColor();
 
   return (
     <ThemedView style={styles.container}>
@@ -30,7 +44,7 @@ export function PointsDashboard() {
             cx="60"
             cy="60"
             r="40"
-            stroke="#FDBF50"
+            stroke={progressColor}
             strokeWidth="10"
             fill="transparent"
             strokeDasharray="251.2"
@@ -69,7 +83,7 @@ const styles = StyleSheet.create({
   progressContainer: {
     width: 120,
     height: 120,
-    marginRight: 20,
+    marginRight: 10,
     justifyContent: "center",
     alignItems: "flex-start",
   },

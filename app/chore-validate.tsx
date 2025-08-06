@@ -2,10 +2,11 @@ import { Button } from "@/components/Button";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useGlobalChores } from "@/context/ChoreContext";
+import { Chore, getChoreByIdAPI } from "@/data/mock";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { BadgeCheck } from "lucide-react-native";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
 
 export default function ChoreValidate() {
@@ -14,11 +15,20 @@ export default function ChoreValidate() {
   const { completeChore } = useGlobalChores();
   const [permission, requestPermission] = useCameraPermissions();
   const [isAnimating, setIsAnimating] = useState(false);
+  const [chore, setChore] = useState<Chore | null>(null);
 
   // Animation values
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const checkOpacity = useRef(new Animated.Value(0)).current;
   const checkTranslateY = useRef(new Animated.Value(50)).current;
+
+  // Get chore data when component mounts or UUID changes
+  useEffect(() => {
+    if (uuid) {
+      const foundChore = getChoreByIdAPI(uuid as string);
+      setChore(foundChore ?? null);
+    }
+  }, [uuid]);
 
   const handleTakePhoto = async () => {
     if (uuid && !isAnimating) {
@@ -119,7 +129,7 @@ export default function ChoreValidate() {
         pointerEvents="none"
       />
 
-      {/* Check mark */}
+      {/* Check mark and points */}
       <Animated.View
         style={[
           styles.checkContainer,
@@ -131,6 +141,11 @@ export default function ChoreValidate() {
         pointerEvents="none"
       >
         <BadgeCheck size={100} color="#4CAF50" strokeWidth={2} />
+        {chore && (
+          <ThemedText style={styles.pointsText}>
+            +{chore.points} points
+          </ThemedText>
+        )}
       </Animated.View>
     </View>
   );
@@ -167,5 +182,12 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
+  },
+  pointsText: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#4CAF50",
+    marginTop: 10,
+    textAlign: "center",
   },
 });
