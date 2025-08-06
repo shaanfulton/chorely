@@ -108,7 +108,12 @@ interface GlobalChoreContextType {
 
   // User Actions
   loginUser: (email: string) => Promise<boolean>;
-  signupUser: (email: string, homeId?: string) => Promise<boolean>;
+  signupUser: (
+    email: string,
+    name: string,
+    homeId?: string
+  ) => Promise<boolean>;
+  logoutUser: () => void;
   switchHome: (homeId: string) => Promise<void>;
   createHome: (
     name: string,
@@ -195,10 +200,10 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
 
   // Signup user
   const signupUser = useCallback(
-    async (email: string, homeId?: string): Promise<boolean> => {
+    async (email: string, name: string, homeId?: string): Promise<boolean> => {
       try {
         setError(null);
-        const user = createUserAPI(email, homeId);
+        const user = createUserAPI(email, name, homeId);
 
         setCurrentUser(user);
 
@@ -226,6 +231,19 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
     },
     []
   );
+
+  // Logout user
+  const logoutUser = useCallback(() => {
+    setCurrentUser(null);
+    setCurrentHome(null);
+    setUserHomes([]);
+    setAvailableChores([]);
+    setMyChores([]);
+    setPendingApprovalChores([]);
+    setUserPoints(0);
+    setAllUserPoints({});
+    setError(null);
+  }, []);
 
   // Switch home
   const switchHome = useCallback(
@@ -588,6 +606,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
     // User actions
     loginUser,
     signupUser,
+    logoutUser,
     switchHome,
     createHome,
     joinHome,

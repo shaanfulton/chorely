@@ -10,6 +10,7 @@ export interface TodoItem {
 
 export interface User {
   email: string;
+  name: string;
   homeIDs: string[];
 }
 
@@ -71,14 +72,17 @@ const HOMES: Home[] = [
 const USERS: User[] = [
   {
     email: "user@example.com",
+    name: "John Doe",
     homeIDs: ["home_1", "home_2"],
   },
   {
     email: "roommate@example.com",
+    name: "Jane Smith",
     homeIDs: ["home_1"],
   },
   {
     email: "family@example.com",
+    name: "Mike Johnson",
     homeIDs: ["home_2", "home_3"],
   },
 ];
@@ -342,7 +346,11 @@ export const getUserHomesAPI = (email: string): Home[] => {
   return HOMES.filter((home) => user.homeIDs.includes(home.id));
 };
 
-export const createUserAPI = (email: string, homeId?: string): User => {
+export const createUserAPI = (
+  email: string,
+  name: string,
+  homeId?: string
+): User => {
   // Check if user already exists
   const existingUser = getUserByEmailAPI(email);
   if (existingUser) {
@@ -352,6 +360,7 @@ export const createUserAPI = (email: string, homeId?: string): User => {
   // Create new user
   const newUser: User = {
     email,
+    name,
     homeIDs: homeId ? [homeId] : [],
   };
 

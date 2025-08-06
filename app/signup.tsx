@@ -17,6 +17,7 @@ import {
 
 export default function SignupScreen() {
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { signupUser } = useGlobalChores();
 
@@ -25,11 +26,15 @@ export default function SignupScreen() {
       Alert.alert("Error", "Please enter your email address");
       return;
     }
+    if (!name.trim()) {
+      Alert.alert("Error", "Please enter your name");
+      return;
+    }
 
     setIsLoading(true);
     try {
       // Create user without home first
-      const success = await signupUser(email.trim().toLowerCase());
+      const success = await signupUser(email.trim().toLowerCase(), name.trim());
       if (success) {
         // Navigate to home selection page
         router.push("/signup-home-selection");
@@ -71,6 +76,17 @@ export default function SignupScreen() {
           </View>
 
           <View style={styles.form}>
+            <Text style={styles.label}>Full Name</Text>
+            <TextInput
+              style={styles.input}
+              value={name}
+              onChangeText={setName}
+              placeholder="Enter your full name"
+              autoCapitalize="words"
+              autoCorrect={false}
+              editable={!isLoading}
+            />
+
             <Text style={styles.label}>Email Address</Text>
             <TextInput
               style={styles.input}
