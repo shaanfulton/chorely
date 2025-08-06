@@ -24,12 +24,6 @@ export function UserInformation() {
             {currentHome?.name || "None selected"}
           </Text>
         </View>
-        {currentHome && (
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Address:</Text>
-            <Text style={styles.infoValue}>{currentHome.address}</Text>
-          </View>
-        )}
       </View>
     </View>
   );

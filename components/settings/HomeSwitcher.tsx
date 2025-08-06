@@ -61,7 +61,6 @@ export function HomeSwitcher({ isLoading, setIsLoading }: HomeSwitcherProps) {
                 >
                   {home.name}
                 </Text>
-                <Text style={styles.homeOptionAddress}>{home.address}</Text>
                 {currentHome?.id === home.id && (
                   <Text style={styles.currentLabel}>Current</Text>
                 )}
@@ -130,10 +129,7 @@ const styles = StyleSheet.create({
   homeOptionNameSelected: {
     color: "#007AFF",
   },
-  homeOptionAddress: {
-    fontSize: 14,
-    color: "#666",
-  },
+
   currentLabel: {
     fontSize: 12,
     color: "#007AFF",

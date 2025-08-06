@@ -1,6 +1,7 @@
 import { Button } from "@/components/Button";
 import { CenterModal } from "@/components/CenterModal";
 import { Checklist } from "@/components/Checklist";
+import { PointTag } from "@/components/PointTag";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
@@ -22,11 +23,17 @@ import { StyleSheet, View } from "react-native";
 function ChoreViewContent({ chore }: { chore: Chore }) {
   const [selectedItem, setSelectedItem] = useState<TodoItem | null>(null);
   const { isAllCompleted, resetCompleted } = useChecklist();
-  const { claimChore, approveChore } = useGlobalChores();
+  const {
+    claimChore,
+    voteForChore,
+    removeVoteForChore,
+    getChoreApprovalStatus,
+    currentUser,
+  } = useGlobalChores();
   const router = useRouter();
   const currentUserEmail = getCurrentUserEmail();
   const [isClaimingChore, setIsClaimingChore] = useState(false);
-  const [isApprovingChore, setIsApprovingChore] = useState(false);
+  const [isVotingChore, setIsVotingChore] = useState(false);
   const [isNavigatingToValidation, setIsNavigatingToValidation] =
     useState(false);
 
@@ -61,32 +68,64 @@ function ChoreViewContent({ chore }: { chore: Chore }) {
     }
   };
 
-  const handleApproveChore = async () => {
+  const handleVoteToggle = async () => {
+    if (!currentUser) return;
+
     try {
-      setIsApprovingChore(true);
-      await approveChore(chore.uuid);
-      // Navigate back to home after approval
-      router.push("/");
+      setIsVotingChore(true);
+      const approvalStatus = getChoreApprovalStatus(chore.uuid);
+
+      if (approvalStatus?.hasVoted[currentUser.email]) {
+        // User has already voted, remove their vote
+        await removeVoteForChore(chore.uuid);
+      } else {
+        // User hasn't voted yet, add their vote
+        const success = await voteForChore(chore.uuid);
+        // If the chore got approved (status changed), navigate back to home
+        if (success) {
+          const updatedStatus = getChoreApprovalStatus(chore.uuid);
+          if (updatedStatus?.isApproved) {
+            router.push("/");
+          }
+        }
+      }
     } catch (error) {
-      console.error("Failed to approve chore:", error);
+      console.error("Failed to toggle vote:", error);
     } finally {
-      setIsApprovingChore(false);
+      setIsVotingChore(false);
     }
   };
 
   // Determine what to render based on chore ownership and status
   const getButtonContent = () => {
-    // If chore is unapproved - show approve button
+    // If chore is unapproved - show voting button
     if (chore.status === "unapproved") {
+      const approvalStatus = getChoreApprovalStatus(chore.uuid);
+      const hasUserVoted = currentUser
+        ? approvalStatus?.hasVoted[currentUser.email] || false
+        : false;
+      const votesText = approvalStatus
+        ? `${approvalStatus.currentVotes}/${approvalStatus.votesNeeded} votes needed`
+        : "";
+
       return (
-        <Button
-          title="Approve"
-          backgroundColor={Colors.metro.green}
-          loadingBackgroundColor={Colors.metro.teal}
-          isLoading={isApprovingChore}
-          onPress={handleApproveChore}
-          size="medium"
-        />
+        <View style={{ alignItems: "center" }}>
+          <ThemedText
+            style={{ fontSize: 14, marginBottom: 8, textAlign: "center" }}
+          >
+            {votesText}
+          </ThemedText>
+          <Button
+            title={hasUserVoted ? "Remove Vote" : "Vote to Approve"}
+            backgroundColor={
+              hasUserVoted ? Colors.metro.orange : Colors.metro.green
+            }
+            loadingBackgroundColor={Colors.metro.teal}
+            isLoading={isVotingChore}
+            onPress={handleVoteToggle}
+            size="medium"
+          />
+        </View>
       );
     }
 
@@ -149,12 +188,19 @@ function ChoreViewContent({ chore }: { chore: Chore }) {
     <ThemedView style={styles.container}>
       <IconComponent size={64} color="#666" />
       <ThemedText style={styles.title}>{chore.name}</ThemedText>
-      <View style={styles.timeDisplay}>
-        <Clock size={18} color={timeRemaining.color} />
-        <ThemedText style={[styles.timeText, { color: timeRemaining.color }]}>
-          {timeRemaining.text}
-        </ThemedText>
-      </View>
+      {chore.status !== "unapproved" && (
+        <View style={styles.timeDisplay}>
+          <Clock size={18} color={timeRemaining.color} />
+          <ThemedText style={[styles.timeText, { color: timeRemaining.color }]}>
+            {timeRemaining.text}
+          </ThemedText>
+        </View>
+      )}
+      {chore.status !== "unapproved" && (
+        <View style={styles.pointsDisplay}>
+          <PointTag points={chore.points} size="medium" />
+        </View>
+      )}
       <Checklist
         items={chore.todos}
         onItemPress={setSelectedItem}
@@ -225,12 +271,16 @@ const styles = StyleSheet.create({
   timeDisplay: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 10,
   },
   timeText: {
     fontSize: 16,
     marginLeft: 6,
     fontWeight: "600",
+  },
+  pointsDisplay: {
+    alignItems: "center",
+    marginBottom: 20,
   },
   modalContent: {
     padding: 20,

@@ -17,7 +17,6 @@ export interface User {
 export interface Home {
   id: string;
   name: string;
-  address: string;
   userPoints: { [userEmail: string]: number };
   weeklyPointQuota: number;
 }
@@ -33,6 +32,7 @@ export interface Chore {
   todos: TodoItem[];
   homeID: string;
   points: number;
+  approvalList: string[]; // Array of user emails who have approved this chore
 }
 
 // Mock data for homes
@@ -40,7 +40,6 @@ const HOMES: Home[] = [
   {
     id: "home_1",
     name: "Main House",
-    address: "123 Main St, Berkeley, CA",
     userPoints: {
       "user@example.com": 15,
       "roommate@example.com": 42,
@@ -50,7 +49,6 @@ const HOMES: Home[] = [
   {
     id: "home_2",
     name: "Summer Cabin",
-    address: "456 Lake View Dr, Tahoe, CA",
     userPoints: {
       "user@example.com": 120,
       "family@example.com": 95,
@@ -60,7 +58,6 @@ const HOMES: Home[] = [
   {
     id: "home_3",
     name: "Downtown Apartment",
-    address: "789 Market St, San Francisco, CA",
     userPoints: {
       "family@example.com": 73,
     },
@@ -120,6 +117,7 @@ const CHORES: Chore[] = [
       { name: "Step 2", description: "Detailed description for step 2." },
     ],
     points: 10,
+    approvalList: [],
   },
   {
     uuid: uuidv4(),
@@ -149,6 +147,7 @@ const CHORES: Chore[] = [
       },
     ],
     points: 10,
+    approvalList: [],
   },
   {
     uuid: uuidv4(),
@@ -171,6 +170,7 @@ const CHORES: Chore[] = [
       },
     ],
     points: 10,
+    approvalList: [],
   },
   {
     uuid: uuidv4(),
@@ -200,6 +200,7 @@ const CHORES: Chore[] = [
       },
     ],
     points: 10,
+    approvalList: [],
   },
   {
     uuid: uuidv4(),
@@ -225,6 +226,7 @@ const CHORES: Chore[] = [
       },
     ],
     points: 10,
+    approvalList: [],
   },
   {
     uuid: uuidv4(),
@@ -250,6 +252,7 @@ const CHORES: Chore[] = [
       },
     ],
     points: 10,
+    approvalList: [],
   },
   {
     uuid: uuidv4(),
@@ -273,6 +276,7 @@ const CHORES: Chore[] = [
       { name: "Dry and put away", description: "Use a towel or drying rack." },
     ],
     points: 10,
+    approvalList: [],
   },
   {
     uuid: uuidv4(),
@@ -298,6 +302,7 @@ const CHORES: Chore[] = [
       },
     ],
     points: 10,
+    approvalList: [],
   },
   {
     uuid: uuidv4(),
@@ -327,6 +332,7 @@ const CHORES: Chore[] = [
       },
     ],
     points: 10,
+    approvalList: [],
   },
 ];
 
@@ -353,6 +359,10 @@ export const getUserHomesAPI = (email: string): Home[] => {
   return HOMES.filter((home) => user.homeIDs.includes(home.id));
 };
 
+export const getHomeUsersAPI = (homeId: string): User[] => {
+  return USERS.filter((user) => user.homeIDs.includes(homeId));
+};
+
 export const createUserAPI = (
   email: string,
   name: string,
@@ -377,13 +387,11 @@ export const createUserAPI = (
 
 export const createHomeAPI = (
   name: string,
-  address: string,
   weeklyPointQuota: number = 100
 ): Home => {
   const newHome: Home = {
     id: `home_${Date.now()}`, // Simple ID generation for mock
     name,
-    address,
     userPoints: {},
     weeklyPointQuota,
   };
@@ -408,7 +416,10 @@ export const joinHomeAPI = (email: string, homeId: string): boolean => {
 };
 
 export const createChoreAPI = (
-  choreData: Omit<Chore, "uuid" | "status" | "user_email" | "todos" | "homeID">,
+  choreData: Omit<
+    Chore,
+    "uuid" | "status" | "user_email" | "todos" | "homeID" | "approvalList"
+  >,
   homeID: string
 ) => {
   const newChore: Chore = {
@@ -418,6 +429,7 @@ export const createChoreAPI = (
     status: "unapproved",
     homeID,
     points: choreData.points || 10, // Default to 10 points if not specified
+    approvalList: [],
     todos: [
       { name: "Item 1", description: "Detailed description for item 1." },
       { name: "Item 2", description: "Detailed description for item 2." },
@@ -457,10 +469,95 @@ export const getUnapprovedChoresAPI = (homeID: string): Chore[] => {
   );
 };
 
-export const approveChoreAPI = (uuid: string): void => {
+// Vote for a chore approval
+export const voteForChoreAPI = (uuid: string, userEmail: string): boolean => {
   const chore = CHORES.find((chore) => chore.uuid === uuid);
-  if (chore) {
+  if (!chore || chore.status !== "unapproved") {
+    return false;
+  }
+
+  // Check if user is already in approval list
+  if (chore.approvalList.includes(userEmail)) {
+    return false; // User already voted
+  }
+
+  // Add user to approval list
+  chore.approvalList.push(userEmail);
+
+  // Check if chore should be automatically approved
+  const homeUsers = getHomeUsersAPI(chore.homeID);
+  const requiredVotes = Math.ceil(homeUsers.length * 0.5); // 50% threshold
+
+  if (chore.approvalList.length >= requiredVotes) {
     chore.status = "unclaimed";
+  }
+
+  return true;
+};
+
+// Remove vote for a chore approval
+export const removeVoteForChoreAPI = (
+  uuid: string,
+  userEmail: string
+): boolean => {
+  const chore = CHORES.find((chore) => chore.uuid === uuid);
+  if (!chore) {
+    return false;
+  }
+
+  // Remove user from approval list
+  const index = chore.approvalList.indexOf(userEmail);
+  if (index > -1) {
+    chore.approvalList.splice(index, 1);
+    // If chore was approved but now doesn't have enough votes, revert to unapproved
+    const homeUsers = getHomeUsersAPI(chore.homeID);
+    const requiredVotes = Math.ceil(homeUsers.length * 0.5);
+    if (
+      chore.status === "unclaimed" &&
+      chore.approvalList.length < requiredVotes
+    ) {
+      chore.status = "unapproved";
+    }
+    return true;
+  }
+
+  return false;
+};
+
+// Get approval status for a chore
+export const getChoreApprovalStatusAPI = (
+  uuid: string
+): {
+  hasVoted: { [userEmail: string]: boolean };
+  votesNeeded: number;
+  currentVotes: number;
+  isApproved: boolean;
+} | null => {
+  const chore = CHORES.find((chore) => chore.uuid === uuid);
+  if (!chore) {
+    return null;
+  }
+
+  const homeUsers = getHomeUsersAPI(chore.homeID);
+  const requiredVotes = Math.ceil(homeUsers.length * 0.5);
+  const hasVoted: { [userEmail: string]: boolean } = {};
+
+  homeUsers.forEach((user) => {
+    hasVoted[user.email] = chore.approvalList.includes(user.email);
+  });
+
+  return {
+    hasVoted,
+    votesNeeded: requiredVotes,
+    currentVotes: chore.approvalList.length,
+    isApproved: chore.status !== "unapproved",
+  };
+};
+
+// Legacy function for backward compatibility - now acts as a vote
+export const approveChoreAPI = (uuid: string, userEmail?: string): void => {
+  if (userEmail) {
+    voteForChoreAPI(uuid, userEmail);
   }
 };
 

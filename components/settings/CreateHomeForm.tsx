@@ -61,6 +61,7 @@ export function CreateHomeForm({
             value={homeName}
             onChangeText={setHomeName}
             placeholder="Enter home name (e.g., My House)"
+            placeholderTextColor="#999"
             editable={!isLoading}
           />
 
@@ -70,6 +71,7 @@ export function CreateHomeForm({
             value={homeAddress}
             onChangeText={setHomeAddress}
             placeholder="Enter address"
+            placeholderTextColor="#999"
             editable={!isLoading}
           />
 

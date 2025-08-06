@@ -7,8 +7,15 @@ import { Button } from "./Button";
 import { ThemedText } from "./ThemedText";
 
 export function ChoreApprovalList() {
-  const { pendingApprovalChores, isLoading, approveChore } = useGlobalChores();
-  const [approvingChoreId, setApprovingChoreId] = useState<string | null>(null);
+  const {
+    pendingApprovalChores,
+    isLoading,
+    voteForChore,
+    removeVoteForChore,
+    getChoreApprovalStatus,
+    currentUser,
+  } = useGlobalChores();
+  const [votingChoreId, setVotingChoreId] = useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -22,32 +29,59 @@ export function ChoreApprovalList() {
     return null;
   }
 
-  const handleApproveChore = async (choreId: string) => {
+  const handleVoteToggle = async (choreId: string) => {
+    if (!currentUser) return;
+
     try {
-      setApprovingChoreId(choreId);
-      await approveChore(choreId);
+      setVotingChoreId(choreId);
+      const approvalStatus = getChoreApprovalStatus(choreId);
+
+      if (approvalStatus?.hasVoted[currentUser.email]) {
+        // User has already voted, remove their vote
+        await removeVoteForChore(choreId);
+      } else {
+        // User hasn't voted yet, add their vote
+        await voteForChore(choreId);
+      }
     } catch (error) {
-      console.error("Failed to approve chore:", error);
+      console.error("Failed to toggle vote:", error);
     } finally {
-      setApprovingChoreId(null);
+      setVotingChoreId(null);
     }
   };
 
   return (
     <View style={styles.container}>
-      <ThemedText type="subtitle">Approve New Chores</ThemedText>
-      {pendingApprovalChores.map((chore) => (
-        <ApprovalListItem key={chore.uuid} chore={chore}>
-          <Button
-            title="Approve"
-            backgroundColor={Colors.metro.green}
-            loadingBackgroundColor={Colors.metro.teal}
-            isLoading={approvingChoreId === chore.uuid}
-            onPress={() => handleApproveChore(chore.uuid)}
-            size="small"
-          />
-        </ApprovalListItem>
-      ))}
+      <ThemedText type="subtitle">Vote on New Chores</ThemedText>
+      {pendingApprovalChores.map((chore) => {
+        const approvalStatus = getChoreApprovalStatus(chore.uuid);
+        const hasUserVoted = currentUser
+          ? approvalStatus?.hasVoted[currentUser.email] || false
+          : false;
+        const votesText = approvalStatus
+          ? `${approvalStatus.currentVotes}/${approvalStatus.votesNeeded} votes`
+          : "";
+
+        return (
+          <ApprovalListItem key={chore.uuid} chore={chore}>
+            <View style={{ alignItems: "center" }}>
+              <ThemedText style={{ fontSize: 12, marginBottom: 4 }}>
+                {votesText}
+              </ThemedText>
+              <Button
+                title={hasUserVoted ? "Remove Vote" : "Vote"}
+                backgroundColor={
+                  hasUserVoted ? Colors.metro.orange : Colors.metro.green
+                }
+                loadingBackgroundColor={Colors.metro.teal}
+                isLoading={votingChoreId === chore.uuid}
+                onPress={() => handleVoteToggle(chore.uuid)}
+                size="small"
+              />
+            </View>
+          </ApprovalListItem>
+        );
+      })}
     </View>
   );
 }

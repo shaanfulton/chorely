@@ -10,12 +10,11 @@ import { Alert, ScrollView, StyleSheet, TextInput, View } from "react-native";
 export default function CreateHomeScreen() {
   const { createHome } = useGlobalChores();
   const [homeName, setHomeName] = useState("");
-  const [homeAddress, setHomeAddress] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
   const handleSave = async () => {
-    if (!homeName.trim() || !homeAddress.trim()) {
-      Alert.alert("Error", "Please enter both home name and address");
+    if (!homeName.trim()) {
+      Alert.alert("Error", "Please enter a home name");
       return;
     }
 
@@ -24,7 +23,7 @@ export default function CreateHomeScreen() {
     try {
       setIsCreating(true);
 
-      await createHome(homeName.trim(), homeAddress.trim());
+      await createHome(homeName.trim());
 
       Alert.alert(
         "Home Created",
@@ -58,19 +57,6 @@ export default function CreateHomeScreen() {
             value={homeName}
             onChangeText={setHomeName}
             placeholder="Enter home name (e.g., My House)"
-            placeholderTextColor="#999"
-          />
-        </View>
-
-        <View style={styles.formGroup}>
-          <ThemedText type="defaultSemiBold" style={styles.label}>
-            Address
-          </ThemedText>
-          <TextInput
-            style={styles.input}
-            value={homeAddress}
-            onChangeText={setHomeAddress}
-            placeholder="Enter home address"
             placeholderTextColor="#999"
           />
         </View>

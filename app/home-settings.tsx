@@ -1,8 +1,12 @@
+import { Button } from "@/components/Button";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import { Colors } from "@/constants/Colors";
 import { useGlobalChores } from "@/context/ChoreContext";
-import { Home } from "@/data/mock";
+import { Home as HomeType } from "@/data/mock";
+import * as Clipboard from "expo-clipboard";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Check, Copy, Home } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -20,9 +24,10 @@ export default function HomeSettingsScreen() {
   const { userHomes, updateHomeWeeklyQuota, leaveHome, currentUser } =
     useGlobalChores();
 
-  const [home, setHome] = useState<Home | null>(null);
+  const [home, setHome] = useState<HomeType | null>(null);
   const [weeklyQuota, setWeeklyQuota] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
     const foundHome = userHomes.find((h) => h.id === homeId);
@@ -62,6 +67,19 @@ export default function HomeSettingsScreen() {
       Alert.alert("Error", "Failed to update weekly quota. Please try again.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCopyHomeId = async () => {
+    if (!home) return;
+
+    try {
+      await Clipboard.setStringAsync(home.id);
+      setIsCopied(true);
+      // Reset the copied state after 2 seconds
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (error) {
+      Alert.alert("Error", "Failed to copy Home ID");
     }
   };
 
@@ -121,10 +139,31 @@ export default function HomeSettingsScreen() {
       >
         {/* Home Info Section */}
         <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Home Information</ThemedText>
-          <View style={styles.infoCard}>
+          <View style={styles.homeHeader}>
+            <Home size={24} color={Colors.light.text} />
             <Text style={styles.homeTitle}>{home.name}</Text>
-            <Text style={styles.homeAddress}>{home.address}</Text>
+          </View>
+
+          {/* Home ID Tag */}
+          <View style={styles.homeIdSection}>
+            <Text style={styles.homeIdLabel}>Home ID</Text>
+            <TouchableOpacity
+              style={[styles.homeIdTag, isCopied && styles.homeIdTagCopied]}
+              onPress={handleCopyHomeId}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[styles.homeIdText, isCopied && styles.homeIdTextCopied]}
+              >
+                {home.id}
+              </Text>
+              {isCopied && <Text style={styles.copiedText}>Copied</Text>}
+              {isCopied ? (
+                <Check size={16} color="#22c55e" />
+              ) : (
+                <Copy size={16} color="#666" />
+              )}
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -145,31 +184,27 @@ export default function HomeSettingsScreen() {
               keyboardType="numeric"
               editable={!isLoading}
             />
-            <TouchableOpacity
-              style={[styles.updateButton, isLoading && styles.buttonDisabled]}
+            <Button
+              title={isLoading ? "Updating..." : "Update"}
               onPress={handleUpdateQuota}
               disabled={isLoading}
-            >
-              <Text style={styles.updateButtonText}>
-                {isLoading ? "Updating..." : "Update"}
-              </Text>
-            </TouchableOpacity>
+              isLoading={isLoading}
+              backgroundColor={Colors.metro.blue}
+              size="medium"
+            />
           </View>
         </View>
 
-        {/* Danger Zone Section */}
-        <View style={[styles.section, styles.dangerSection]}>
-          <ThemedText style={styles.sectionTitle}>Danger Zone</ThemedText>
-          <Text style={styles.sectionDescription}>
-            These actions cannot be undone. Please proceed with caution.
-          </Text>
-          <TouchableOpacity
-            style={[styles.dangerButton, isLoading && styles.buttonDisabled]}
+        {/* Leave Home Section */}
+        <View style={styles.section}>
+          <Button
+            title="Leave Home"
             onPress={handleLeaveHome}
             disabled={isLoading}
-          >
-            <Text style={styles.dangerButtonText}>Leave Home</Text>
-          </TouchableOpacity>
+            backgroundColor={Colors.metro.red}
+            size="large"
+            style={styles.leaveButton}
+          />
         </View>
       </ScrollView>
     </ThemedView>
@@ -179,42 +214,78 @@ export default function HomeSettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: Colors.light.background,
   },
   scrollView: {
     flex: 1,
     padding: 20,
   },
   section: {
-    marginBottom: 32,
+    marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 8,
+    fontSize: 22,
+    fontWeight: "700",
+    color: Colors.light.text,
+    marginBottom: 12,
   },
   sectionDescription: {
-    fontSize: 14,
-    color: "#666",
+    fontSize: 15,
+    color: Colors.light.icon,
     marginBottom: 16,
-    lineHeight: 20,
+    lineHeight: 22,
   },
-  infoCard: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#e1e1e1",
+  homeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 16,
   },
   homeTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 4,
+    fontSize: 24,
+    fontWeight: "700",
+    color: Colors.light.text,
   },
-  homeAddress: {
+
+  homeIdSection: {
+    marginTop: 0,
+  },
+  homeIdLabel: {
     fontSize: 14,
-    color: "#666",
+    color: Colors.light.icon,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  homeIdTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f8f9fa",
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+    alignSelf: "flex-start",
+  },
+  homeIdText: {
+    fontSize: 14,
+    color: Colors.light.text,
+    fontFamily: "monospace",
+    fontWeight: "500",
+  },
+  homeIdTagCopied: {
+    backgroundColor: "#dcfce7",
+    borderColor: "#22c55e",
+    borderWidth: 1,
+  },
+  homeIdTextCopied: {
+    color: "#16a34a",
+  },
+  copiedText: {
+    fontSize: 12,
+    color: "#16a34a",
+    fontWeight: "600",
   },
   inputContainer: {
     flexDirection: "row",
@@ -224,40 +295,22 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     backgroundColor: "white",
-    borderRadius: 8,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#e1e1e1",
-    fontSize: 16,
-  },
-  updateButton: {
-    backgroundColor: "#007AFF",
-    borderRadius: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  updateButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  dangerSection: {
-    borderTopWidth: 1,
-    borderTopColor: "#ffebee",
-    paddingTop: 24,
-  },
-  dangerButton: {
-    backgroundColor: "#dc3545",
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
-    alignItems: "center",
-  },
-  dangerButtonText: {
-    color: "white",
+    borderWidth: 1,
+    borderColor: "#e9ecef",
     fontSize: 16,
-    fontWeight: "600",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  buttonDisabled: {
-    opacity: 0.6,
+
+  leaveButton: {
+    width: "100%",
   },
 });

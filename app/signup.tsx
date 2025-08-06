@@ -76,12 +76,13 @@ export default function SignupScreen() {
           </View>
 
           <View style={styles.form}>
-            <Text style={styles.label}>Full Name</Text>
+            <Text style={styles.label}>User Name</Text>
             <TextInput
               style={styles.input}
               value={name}
               onChangeText={setName}
-              placeholder="Enter your full name"
+              placeholder="Enter your user name"
+              placeholderTextColor="#999"
               autoCapitalize="words"
               autoCorrect={false}
               editable={!isLoading}
@@ -93,6 +94,7 @@ export default function SignupScreen() {
               value={email}
               onChangeText={setEmail}
               placeholder="Enter your email"
+              placeholderTextColor="#999"
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}

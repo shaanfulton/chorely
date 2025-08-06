@@ -1,5 +1,4 @@
 import {
-  approveChoreAPI,
   Chore,
   claimChoreAPI,
   completeChoreAPI,
@@ -8,6 +7,7 @@ import {
   createUserAPI,
   getAllUserPointsAPI,
   getAvailableChoresAPI,
+  getChoreApprovalStatusAPI,
   getHomeByIdAPI,
   getMyChoresAPI,
   getUnapprovedChoresAPI,
@@ -17,9 +17,11 @@ import {
   joinHomeAPI,
   leaveHomeAPI,
   loginUserAPI,
+  removeVoteForChoreAPI,
   updateHomeWeeklyQuotaAPI,
   updateUserPointsAPI,
   User,
+  voteForChoreAPI,
 } from "@/data/mock";
 import React, {
   createContext,
@@ -117,11 +119,7 @@ interface GlobalChoreContextType {
   ) => Promise<boolean>;
   logoutUser: () => void;
   switchHome: (homeId: string) => Promise<void>;
-  createHome: (
-    name: string,
-    address: string,
-    weeklyPointQuota?: number
-  ) => Promise<Home>;
+  createHome: (name: string, weeklyPointQuota?: number) => Promise<Home>;
   joinHome: (homeId: string) => Promise<boolean>;
   updateHomeWeeklyQuota: (
     homeId: string,
@@ -132,11 +130,18 @@ interface GlobalChoreContextType {
   // Chore Actions
   claimChore: (choreUuid: string) => Promise<void>;
   completeChore: (choreUuid: string) => Promise<void>;
-  approveChore: (choreUuid: string) => Promise<void>;
+  voteForChore: (choreUuid: string) => Promise<boolean>;
+  removeVoteForChore: (choreUuid: string) => Promise<boolean>;
+  getChoreApprovalStatus: (choreUuid: string) => {
+    hasVoted: { [userEmail: string]: boolean };
+    votesNeeded: number;
+    currentVotes: number;
+    isApproved: boolean;
+  } | null;
   createChore: (
     choreData: Omit<
       Chore,
-      "uuid" | "status" | "user_email" | "todos" | "homeID"
+      "uuid" | "status" | "user_email" | "todos" | "homeID" | "approvalList"
     >
   ) => Promise<Chore>;
   refreshAllData: () => Promise<void>;
@@ -395,48 +400,66 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
     [myChores, currentUser, currentHome, userPoints, allUserPoints]
   );
 
-  // Approve chore with optimistic updates
-  const approveChore = useCallback(
-    async (choreUuid: string) => {
-      const choreToApprove = pendingApprovalChores.find(
+  // Vote for chore approval
+  const voteForChore = useCallback(
+    async (choreUuid: string): Promise<boolean> => {
+      if (!currentUser) return false;
+
+      const choreToVote = pendingApprovalChores.find(
         (chore) => chore.uuid === choreUuid
       );
-      if (!choreToApprove) return;
-
-      // Optimistic update - move from pending to available
-      const updatedPending = pendingApprovalChores.filter(
-        (chore) => chore.uuid !== choreUuid
-      );
-      const approvedChore = {
-        ...choreToApprove,
-        status: "unclaimed" as const,
-      };
-      const updatedAvailable = [...availableChores, approvedChore];
-
-      setPendingApprovalChores(updatedPending);
-      setAvailableChores(updatedAvailable);
+      if (!choreToVote) return false;
 
       try {
-        // Make API call
-        approveChoreAPI(choreUuid);
+        const success = voteForChoreAPI(choreUuid, currentUser.email);
+        if (success) {
+          // Refresh data to get updated state
+          await fetchAllData();
+        }
+        return success;
       } catch (err) {
-        // Rollback on error
-        setPendingApprovalChores(pendingApprovalChores);
-        setAvailableChores(availableChores);
         setError(
-          err instanceof Error ? err.message : "Failed to approve chore"
+          err instanceof Error ? err.message : "Failed to vote for chore"
         );
+        return false;
       }
     },
-    [pendingApprovalChores, availableChores]
+    [pendingApprovalChores, currentUser, fetchAllData]
   );
+
+  // Remove vote for chore approval
+  const removeVoteForChore = useCallback(
+    async (choreUuid: string): Promise<boolean> => {
+      if (!currentUser) return false;
+
+      try {
+        const success = removeVoteForChoreAPI(choreUuid, currentUser.email);
+        if (success) {
+          // Refresh data to get updated state
+          await fetchAllData();
+        }
+        return success;
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to remove vote for chore"
+        );
+        return false;
+      }
+    },
+    [currentUser, fetchAllData]
+  );
+
+  // Get chore approval status
+  const getChoreApprovalStatus = useCallback((choreUuid: string) => {
+    return getChoreApprovalStatusAPI(choreUuid);
+  }, []);
 
   // Create chore with optimistic updates
   const createChore = useCallback(
     async (
       choreData: Omit<
         Chore,
-        "uuid" | "status" | "user_email" | "todos" | "homeID"
+        "uuid" | "status" | "user_email" | "todos" | "homeID" | "approvalList"
       >
     ) => {
       if (!currentHome) {
@@ -452,6 +475,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
         status: "unapproved",
         homeID: currentHome.id,
         points: choreData.points || 10, // Default to 10 points if not specified
+        approvalList: [],
         todos: [
           { name: "Item 1", description: "Detailed description for item 1." },
           { name: "Item 2", description: "Detailed description for item 2." },
@@ -488,18 +512,14 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
 
   // Create home
   const createHome = useCallback(
-    async (
-      name: string,
-      address: string,
-      weeklyPointQuota?: number
-    ): Promise<Home> => {
+    async (name: string, weeklyPointQuota?: number): Promise<Home> => {
       if (!currentUser) {
         throw new Error("User must be logged in to create a home");
       }
 
       try {
         setError(null);
-        const newHome = createHomeAPI(name, address, weeklyPointQuota);
+        const newHome = createHomeAPI(name, weeklyPointQuota);
 
         // Join the newly created home
         const joinSuccess = joinHomeAPI(currentUser.email, newHome.id);
@@ -703,7 +723,9 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
     // Chore actions
     claimChore,
     completeChore,
-    approveChore,
+    voteForChore,
+    removeVoteForChore,
+    getChoreApprovalStatus,
     createChore,
     refreshAllData,
     clearError,

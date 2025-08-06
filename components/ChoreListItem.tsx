@@ -1,3 +1,4 @@
+import { PointTag } from "@/components/PointTag";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { ChoreProvider } from "@/context/ChoreContext";
@@ -35,18 +36,22 @@ export function ChoreListItem({
           </View>
           <View style={styles.textContainer}>
             <ThemedText type="defaultSemiBold">{chore.name}</ThemedText>
-            <View style={styles.timeContainer}>
-              <Clock size={14} color={timeRemaining.color} />
-              <ThemedText
-                type="default"
-                style={[styles.timeText, { color: timeRemaining.color }]}
-              >
-                {timeRemaining.text}
-              </ThemedText>
-            </View>
-            <ThemedText type="default" style={styles.pointsText}>
-              {chore.points} pts
-            </ThemedText>
+            {chore.status !== "unclaimed" && (
+              <View style={styles.timeContainer}>
+                <Clock size={14} color={timeRemaining.color} />
+                <ThemedText
+                  type="default"
+                  style={[styles.timeText, { color: timeRemaining.color }]}
+                >
+                  {timeRemaining.text}
+                </ThemedText>
+              </View>
+            )}
+            {chore.status !== "claimed" && (
+              <View style={styles.pointsContainer}>
+                <PointTag points={chore.points} size="small" />
+              </View>
+            )}
           </View>
           <View>
             <ChoreProvider chore={chore}>{children}</ChoreProvider>
@@ -79,16 +84,14 @@ const styles = StyleSheet.create({
   timeContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 2,
+    marginTop: 6,
   },
   timeText: {
     fontSize: 12,
     marginLeft: 4,
     fontWeight: "500",
   },
-  pointsText: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 2,
+  pointsContainer: {
+    marginTop: 6,
   },
 });

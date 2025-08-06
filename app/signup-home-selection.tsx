@@ -21,7 +21,7 @@ export default function SignupHomeSelectionScreen() {
   >(null);
   const [homeId, setHomeId] = useState("");
   const [homeName, setHomeName] = useState("");
-  const [homeAddress, setHomeAddress] = useState("");
+
   const [isLoading, setIsLoading] = useState(false);
   const { joinHome, createHome } = useGlobalChores();
 
@@ -36,11 +36,8 @@ export default function SignupHomeSelectionScreen() {
       return;
     }
 
-    if (
-      selectedOption === "create" &&
-      (!homeName.trim() || !homeAddress.trim())
-    ) {
-      Alert.alert("Error", "Please enter both home name and address");
+    if (selectedOption === "create" && !homeName.trim()) {
+      Alert.alert("Error", "Please enter a home name");
       return;
     }
 
@@ -62,7 +59,7 @@ export default function SignupHomeSelectionScreen() {
           );
         }
       } else if (selectedOption === "create") {
-        await createHome(homeName.trim(), homeAddress.trim());
+        await createHome(homeName.trim());
         Alert.alert("Success!", "Your home has been created successfully.", [
           {
             text: "Continue",
@@ -152,7 +149,8 @@ export default function SignupHomeSelectionScreen() {
                   style={styles.input}
                   value={homeId}
                   onChangeText={setHomeId}
-                  placeholder="Enter home ID (e.g., home_1)"
+                  placeholder="Enter home ID"
+                  placeholderTextColor="#999"
                   autoCapitalize="none"
                   autoCorrect={false}
                   editable={!isLoading}
@@ -167,16 +165,8 @@ export default function SignupHomeSelectionScreen() {
                   style={styles.input}
                   value={homeName}
                   onChangeText={setHomeName}
-                  placeholder="Enter home name (e.g., My House)"
-                  editable={!isLoading}
-                />
-
-                <Text style={styles.inputLabel}>Address</Text>
-                <TextInput
-                  style={styles.input}
-                  value={homeAddress}
-                  onChangeText={setHomeAddress}
-                  placeholder="Enter address"
+                  placeholder="Enter home name"
+                  placeholderTextColor="#999"
                   editable={!isLoading}
                 />
               </View>
