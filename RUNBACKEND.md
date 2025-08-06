@@ -34,7 +34,7 @@ http://localhost:4000
 
 Refer to the API documentation here:
 👉 [ApiDoc.md](https://github.com/lmmeqa/chorely-backend/blob/main/ApiDoc.md)
-👉 [Postman documentation]([https://github.com/lmmeqa/chorely-backend/blob/main/ApiDoc.md](https://documenter.getpostman.com/view/19704779/2sB3BBrXzG))
+or here: [Postman documentation](https://documenter.getpostman.com/view/19704779/2sB3BBrXzG)
 
 ---
 
