@@ -29,7 +29,6 @@ export const ApprovalListItem: React.FC<ApprovalListItemProps> = ({
           <View style={styles.iconContainer}>{Icon && <Icon />}</View>
           <View>
             <ThemedText type="defaultSemiBold">{chore.name}</ThemedText>
-            <ThemedText type="default">{chore.time}</ThemedText>
           </View>
         </Pressable>
       </Link>

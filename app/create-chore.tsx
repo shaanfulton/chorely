@@ -48,11 +48,18 @@ export default function CreateChoreScreen() {
     try {
       setIsCreating(true);
 
+      // Calculate due date based on urgency (1, 2, or 3 days from now)
+      const daysToAdd = choreUrgency + 1; // 0->1 day, 1->2 days, 2->3 days
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + daysToAdd);
+      const dueDateISO = dueDate.toISOString();
+
       await createChore({
         name: choreName,
         description: choreDescription,
-        time: urgencyOptions[choreUrgency],
+        time: dueDateISO,
         icon: choreIcon,
+        points: 10, // Default points value
       });
 
       Alert.alert(

@@ -3,7 +3,9 @@ import { ThemedView } from "@/components/ThemedView";
 import { ChoreProvider } from "@/context/ChoreContext";
 import { Chore } from "@/data/mock";
 import { getLucideIcon } from "@/utils/iconUtils";
+import { getTimeRemaining } from "@/utils/timeUtils";
 import { Link } from "expo-router";
+import { Clock } from "lucide-react-native";
 import React from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
@@ -16,6 +18,8 @@ export function ChoreListItem({
 }) {
   // Get the lucide icon component using utility function
   const IconComponent = getLucideIcon(chore.icon);
+  const timeRemaining = getTimeRemaining(chore.time);
+
   return (
     <Link
       href={{
@@ -31,7 +35,18 @@ export function ChoreListItem({
           </View>
           <View style={styles.textContainer}>
             <ThemedText type="defaultSemiBold">{chore.name}</ThemedText>
-            <ThemedText type="default">{chore.time}</ThemedText>
+            <View style={styles.timeContainer}>
+              <Clock size={14} color={timeRemaining.color} />
+              <ThemedText
+                type="default"
+                style={[styles.timeText, { color: timeRemaining.color }]}
+              >
+                {timeRemaining.text}
+              </ThemedText>
+            </View>
+            <ThemedText type="default" style={styles.pointsText}>
+              {chore.points} pts
+            </ThemedText>
           </View>
           <View>
             <ChoreProvider chore={chore}>{children}</ChoreProvider>
@@ -60,5 +75,20 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     flex: 1,
+  },
+  timeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+  },
+  timeText: {
+    fontSize: 12,
+    marginLeft: 4,
+    fontWeight: "500",
+  },
+  pointsText: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 2,
   },
 });

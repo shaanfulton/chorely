@@ -13,7 +13,9 @@ import {
   getCurrentUserEmail,
 } from "@/data/mock";
 import { getLucideIcon } from "@/utils/iconUtils";
+import { getTimeRemaining } from "@/utils/timeUtils";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Clock } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 
@@ -33,6 +35,7 @@ function ChoreViewContent({ chore }: { chore: Chore }) {
   }, [resetCompleted]);
 
   const IconComponent = getLucideIcon(chore.icon);
+  const timeRemaining = getTimeRemaining(chore.time);
   const allTasksCompleted = isAllCompleted(chore.todos.length);
 
   const handleClaimChore = async () => {
@@ -146,6 +149,12 @@ function ChoreViewContent({ chore }: { chore: Chore }) {
     <ThemedView style={styles.container}>
       <IconComponent size={64} color="#666" />
       <ThemedText style={styles.title}>{chore.name}</ThemedText>
+      <View style={styles.timeDisplay}>
+        <Clock size={18} color={timeRemaining.color} />
+        <ThemedText style={[styles.timeText, { color: timeRemaining.color }]}>
+          {timeRemaining.text}
+        </ThemedText>
+      </View>
       <Checklist
         items={chore.todos}
         onItemPress={setSelectedItem}
@@ -211,7 +220,17 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "bold",
     marginTop: 20,
+    marginBottom: 10,
+  },
+  timeDisplay: {
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 20,
+  },
+  timeText: {
+    fontSize: 16,
+    marginLeft: 6,
+    fontWeight: "600",
   },
   modalContent: {
     padding: 20,

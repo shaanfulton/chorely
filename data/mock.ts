@@ -98,12 +98,19 @@ export const getCurrentHomeID = (): string => {
   return DEFAULT_HOME_ID;
 };
 
+// Helper function to generate realistic due dates within 0-2 days from now
+const generateDueDate = (hoursFromNow: number): string => {
+  const dueDate = new Date();
+  dueDate.setHours(dueDate.getHours() + hoursFromNow);
+  return dueDate.toISOString();
+};
+
 const CHORES: Chore[] = [
   {
     uuid: uuidv4(),
     name: "Sorting Boxes",
     description: "This is an unapproved chore.",
-    time: "1h 15m",
+    time: generateDueDate(36), // 1.5 days from now
     icon: "package",
     user_email: null,
     status: "unapproved",
@@ -118,7 +125,7 @@ const CHORES: Chore[] = [
     uuid: uuidv4(),
     name: "Organizing",
     description: "Organize the living room shelves.",
-    time: "1h 15m",
+    time: generateDueDate(30), // 1.25 days from now
     icon: "package",
     user_email: null,
     status: "unclaimed",
@@ -147,7 +154,7 @@ const CHORES: Chore[] = [
     uuid: uuidv4(),
     name: "Dusting",
     description: "Dust all surfaces in the main room.",
-    time: "25m",
+    time: generateDueDate(-4), // 4 hours overdue
     icon: "feather",
     user_email: null,
     status: "unclaimed",
@@ -169,7 +176,7 @@ const CHORES: Chore[] = [
     uuid: uuidv4(),
     name: "Mopping",
     description: "Mop the kitchen and bathroom floors.",
-    time: "35m",
+    time: generateDueDate(48), // 2 days from now
     icon: "droplets",
     user_email: null,
     status: "unclaimed",
@@ -198,7 +205,7 @@ const CHORES: Chore[] = [
     uuid: uuidv4(),
     name: "Taking out trash",
     description: "Empty all trash cans and take out the garbage.",
-    time: "10m",
+    time: generateDueDate(-12), // 12 hours overdue
     icon: "trash-2",
     user_email: null,
     status: "unclaimed",
@@ -223,7 +230,7 @@ const CHORES: Chore[] = [
     uuid: uuidv4(),
     name: "Sweeping",
     description: "Sweep the front porch.",
-    time: "12h 10m",
+    time: generateDueDate(18), // 18 hours from now
     icon: "brush",
     user_email: DEFAULT_USER_EMAIL,
     status: "claimed",
@@ -248,7 +255,7 @@ const CHORES: Chore[] = [
     uuid: uuidv4(),
     name: "Washing Dishes",
     description: "Wash and dry all dishes in the sink.",
-    time: "30m",
+    time: generateDueDate(3), // 3 hours from now
     icon: "droplets",
     user_email: DEFAULT_USER_EMAIL,
     status: "claimed",
@@ -271,7 +278,7 @@ const CHORES: Chore[] = [
     uuid: uuidv4(),
     name: "Vacuum",
     description: "Vacuum the entire house.",
-    time: "45m",
+    time: generateDueDate(-24), // 1 day overdue
     icon: "wind",
     user_email: DEFAULT_USER_EMAIL,
     status: "complete",
@@ -296,7 +303,7 @@ const CHORES: Chore[] = [
     uuid: uuidv4(),
     name: "Laundry",
     description: "Wash, dry, and fold one load of laundry.",
-    time: "2h",
+    time: generateDueDate(6), // 6 hours from now
     icon: "shirt",
     user_email: DEFAULT_USER_EMAIL,
     status: "complete",
