@@ -7,6 +7,10 @@ services:
       dockerfile: Dockerfile_demo
     environment:
       - DATABASE_URL=postgres://postgres:password@db:5432/chorely
+      - MUTE_DB_LOGS=${MUTE_DB_LOGS:-}
+      - MUTE_API_LOGS=${MUTE_API_LOGS:-}
+      - MUTE_ERROR_LOGS=${MUTE_ERROR_LOGS:-}
+      - SHOW_API_PAYLOADS=${SHOW_API_PAYLOADS:-}
     ports:
       - "4000:4000"
     depends_on:
