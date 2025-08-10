@@ -648,12 +648,6 @@ export const completeChoreAPI = (uuid: string): void => {
     chore.status = "complete";
   }
 };
-export const verifyChoreAPI = (uuid: string): void => {
-  const chore = CHORES.find((chore) => chore.uuid === uuid);
-  if (chore) {
-    chore.status = "complete";
-  }
-};
 // Points-related API functions
 export const getUserPointsAPI = (userEmail: string, homeID: string): number => {
   const home = HOMES.find((home) => home.id === homeID);
