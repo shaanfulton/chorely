@@ -15,7 +15,7 @@
 From the chorely frontend project root (where `docker-compose.yml` should already exist):
 
 ```bash
-docker compose up --pull always --build
+MUTE_DB_LOGS=true docker compose up --pull always --build
 ```
 
 This will:
