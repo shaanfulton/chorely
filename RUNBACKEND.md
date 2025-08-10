@@ -22,6 +22,7 @@ This will:
 - Pull the backend image from GitHub (if updated)
 - Build it for production (faster startup)
 - Start the PostgreSQL database
+    - https://dbdiagram.io/d/68983724dd90d178653d33e4
 - Run all database migrations and seeds
 
 ---
