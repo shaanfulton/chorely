@@ -1,26 +1,21 @@
 import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
-
 export type ChoreStatus = "unapproved" | "unclaimed" | "claimed" | "complete";
-
 export interface TodoItem {
   name: string;
   description: string;
 }
-
 export interface User {
   email: string;
   name: string;
   homeIDs: string[];
 }
-
 export interface Home {
   id: string;
   name: string;
   userPoints: { [userEmail: string]: number };
   weeklyPointQuota: number;
 }
-
 export interface Chore {
   uuid: string;
   name: string;
@@ -34,7 +29,30 @@ export interface Chore {
   points: number;
   approvalList: string[]; // Array of user emails who have approved this chore
 }
-
+export interface Dispute {
+  uuid: string;
+  choreId: string;
+  choreName: string;
+  choreDescription: string;
+  choreIcon: string;
+  disputerEmail: string;
+  disputerName: string;
+  reason: string;
+  imageUrl?: string;
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+}
+export interface RecentActivity {
+  uuid: string;
+  choreId: string;
+  choreName: string;
+  choreDescription: string;
+  choreIcon: string;
+  userEmail: string;
+  userName: string;
+  completedAt: string;
+  canDispute: boolean;
+}
 // Mock data for homes
 const HOMES: Home[] = [
   {
@@ -64,7 +82,6 @@ const HOMES: Home[] = [
     weeklyPointQuota: 80,
   },
 ];
-
 // Mock data for users
 const USERS: User[] = [
   {
@@ -83,25 +100,20 @@ const USERS: User[] = [
     homeIDs: ["home_2", "home_3"],
   },
 ];
-
 const DEFAULT_USER_EMAIL = "user@example.com";
 const DEFAULT_HOME_ID = "home_1";
-
 export const getCurrentUserEmail = (): string => {
   return DEFAULT_USER_EMAIL;
 };
-
 export const getCurrentHomeID = (): string => {
   return DEFAULT_HOME_ID;
 };
-
 // Helper function to generate realistic due dates within 0-2 days from now
 const generateDueDate = (hoursFromNow: number): string => {
   const dueDate = new Date();
   dueDate.setHours(dueDate.getHours() + hoursFromNow);
   return dueDate.toISOString();
 };
-
 const CHORES: Chore[] = [
   {
     uuid: uuidv4(),
@@ -335,34 +347,90 @@ const CHORES: Chore[] = [
     approvalList: [],
   },
 ];
-
+// Mock data for disputes
+const DISPUTES: Dispute[] = [
+  {
+    uuid: uuidv4(),
+    choreId: "dispute-1",
+    choreName: "Kitchen Cleaning",
+    choreDescription: "Clean the kitchen thoroughly",
+    choreIcon: "utensils",
+    disputerEmail: "john@example.com",
+    disputerName: "John",
+    reason: "Not cleaned properly",
+    status: "pending",
+    createdAt: "2024-01-15T10:30:00Z",
+  },
+  {
+    uuid: uuidv4(),
+    choreId: "dispute-2",
+    choreName: "Dusting",
+    choreDescription: "Dust all surfaces",
+    choreIcon: "feather",
+    disputerEmail: "sarah@example.com",
+    disputerName: "Sarah",
+    reason: "Incomplete dusting",
+    status: "pending",
+    createdAt: "2024-01-14T15:45:00Z",
+  },
+];
+// Mock data for recent activities
+const RECENT_ACTIVITIES: RecentActivity[] = [
+  {
+    uuid: uuidv4(),
+    choreId: "activity-1",
+    choreName: "Bathroom Cleaning",
+    choreDescription: "Clean the bathroom",
+    choreIcon: "droplets",
+    userEmail: "mike@example.com",
+    userName: "Mike",
+    completedAt: "2024-01-15T09:00:00Z",
+    canDispute: true,
+  },
+  {
+    uuid: uuidv4(),
+    choreId: "activity-2",
+    choreName: "Grocery Shopping",
+    choreDescription: "Buy groceries",
+    choreIcon: "shopping-cart",
+    userEmail: "lisa@example.com",
+    userName: "Lisa",
+    completedAt: "2024-01-14T16:30:00Z",
+    canDispute: false,
+  },
+  {
+    uuid: uuidv4(),
+    choreId: "activity-3",
+    choreName: "Laundry",
+    choreDescription: "Wash and fold laundry",
+    choreIcon: "shirt",
+    userEmail: "alex@example.com",
+    userName: "Alex",
+    completedAt: "2024-01-13T14:15:00Z",
+    canDispute: true,
+  },
+];
 // User authentication functions
 export const loginUserAPI = (email: string): User | null => {
   return USERS.find((user) => user.email === email) || null;
 };
-
 export const getUserByEmailAPI = (email: string): User | null => {
   return USERS.find((user) => user.email === email) || null;
 };
-
 export const getHomeByIdAPI = (homeId: string): Home | null => {
   return HOMES.find((home) => home.id === homeId) || null;
 };
-
 export const getAllHomesAPI = (): Home[] => {
   return HOMES;
 };
-
 export const getUserHomesAPI = (email: string): Home[] => {
   const user = getUserByEmailAPI(email);
   if (!user) return [];
   return HOMES.filter((home) => user.homeIDs.includes(home.id));
 };
-
 export const getHomeUsersAPI = (homeId: string): User[] => {
   return USERS.filter((user) => user.homeIDs.includes(homeId));
 };
-
 export const createUserAPI = (
   email: string,
   name: string,
@@ -373,18 +441,15 @@ export const createUserAPI = (
   if (existingUser) {
     throw new Error("User already exists");
   }
-
   // Create new user
   const newUser: User = {
     email,
     name,
     homeIDs: homeId ? [homeId] : [],
   };
-
   USERS.push(newUser);
   return newUser;
 };
-
 export const createHomeAPI = (
   name: string,
   weeklyPointQuota: number = 100
@@ -395,26 +460,20 @@ export const createHomeAPI = (
     userPoints: {},
     weeklyPointQuota,
   };
-
   HOMES.push(newHome);
   return newHome;
 };
-
 export const joinHomeAPI = (email: string, homeId: string): boolean => {
   const user = getUserByEmailAPI(email);
   const home = getHomeByIdAPI(homeId);
-
   if (!user || !home) {
     return false;
   }
-
   if (!user.homeIDs.includes(homeId)) {
     user.homeIDs.push(homeId);
   }
-
   return true;
 };
-
 export const createChoreAPI = (
   choreData: Omit<
     Chore,
@@ -440,7 +499,6 @@ export const createChoreAPI = (
   CHORES.push(newChore);
   return newChore;
 };
-
 export const getMyChoresAPI = (email: string, homeID: string): Chore[] => {
   return CHORES.filter(
     (chore) =>
@@ -449,7 +507,6 @@ export const getMyChoresAPI = (email: string, homeID: string): Chore[] => {
       chore.homeID === homeID
   );
 };
-
 export const getAvailableChoresAPI = (homeID: string): Chore[] => {
   return CHORES.filter(
     (chore) =>
@@ -458,43 +515,34 @@ export const getAvailableChoresAPI = (homeID: string): Chore[] => {
       chore.homeID === homeID
   );
 };
-
 export const getChoreByIdAPI = (uuid: string): Chore | undefined => {
   return CHORES.find((chore) => chore.uuid === uuid);
 };
-
 export const getUnapprovedChoresAPI = (homeID: string): Chore[] => {
   return CHORES.filter(
     (chore) => chore.status === "unapproved" && chore.homeID === homeID
   );
 };
-
 // Vote for a chore approval
 export const voteForChoreAPI = (uuid: string, userEmail: string): boolean => {
   const chore = CHORES.find((chore) => chore.uuid === uuid);
   if (!chore || chore.status !== "unapproved") {
     return false;
   }
-
   // Check if user is already in approval list
   if (chore.approvalList.includes(userEmail)) {
     return false; // User already voted
   }
-
   // Add user to approval list
   chore.approvalList.push(userEmail);
-
   // Check if chore should be automatically approved
   const homeUsers = getHomeUsersAPI(chore.homeID);
   const requiredVotes = Math.ceil(homeUsers.length * 0.5); // 50% threshold
-
   if (chore.approvalList.length >= requiredVotes) {
     chore.status = "unclaimed";
   }
-
   return true;
 };
-
 // Remove vote for a chore approval
 export const removeVoteForChoreAPI = (
   uuid: string,
@@ -504,7 +552,6 @@ export const removeVoteForChoreAPI = (
   if (!chore) {
     return false;
   }
-
   // Remove user from approval list
   const index = chore.approvalList.indexOf(userEmail);
   if (index > -1) {
@@ -520,10 +567,8 @@ export const removeVoteForChoreAPI = (
     }
     return true;
   }
-
   return false;
 };
-
 // Get approval status for a chore
 export const getChoreApprovalStatusAPI = (
   uuid: string
@@ -537,15 +582,12 @@ export const getChoreApprovalStatusAPI = (
   if (!chore) {
     return null;
   }
-
   const homeUsers = getHomeUsersAPI(chore.homeID);
   const requiredVotes = Math.ceil(homeUsers.length * 0.5);
   const hasVoted: { [userEmail: string]: boolean } = {};
-
   homeUsers.forEach((user) => {
     hasVoted[user.email] = chore.approvalList.includes(user.email);
   });
-
   return {
     hasVoted,
     votesNeeded: requiredVotes,
@@ -553,14 +595,12 @@ export const getChoreApprovalStatusAPI = (
     isApproved: chore.status !== "unapproved",
   };
 };
-
 // Legacy function for backward compatibility - now acts as a vote
 export const approveChoreAPI = (uuid: string, userEmail?: string): void => {
   if (userEmail) {
     voteForChoreAPI(uuid, userEmail);
   }
 };
-
 export const claimChoreAPI = (uuid: string, email: string): void => {
   const chore = CHORES.find((chore) => chore.uuid === uuid);
   if (chore && chore.status === "unclaimed") {
@@ -568,28 +608,24 @@ export const claimChoreAPI = (uuid: string, email: string): void => {
     chore.status = "claimed";
   }
 };
-
 export const completeChoreAPI = (uuid: string): void => {
   const chore = CHORES.find((chore) => chore.uuid === uuid);
   if (chore) {
     chore.status = "complete";
   }
 };
-
 export const verifyChoreAPI = (uuid: string): void => {
   const chore = CHORES.find((chore) => chore.uuid === uuid);
   if (chore) {
     chore.status = "complete";
   }
 };
-
 // Points-related API functions
 export const getUserPointsAPI = (userEmail: string, homeID: string): number => {
   const home = HOMES.find((home) => home.id === homeID);
   if (!home) return 0;
   return home.userPoints[userEmail] || 0;
 };
-
 export const updateUserPointsAPI = (
   userEmail: string,
   homeID: string,
@@ -603,7 +639,6 @@ export const updateUserPointsAPI = (
     home.userPoints[userEmail] += points;
   }
 };
-
 export const getAllUserPointsAPI = (
   homeID: string
 ): { [userEmail: string]: number } => {
@@ -611,7 +646,6 @@ export const getAllUserPointsAPI = (
   if (!home) return {};
   return home.userPoints;
 };
-
 // Home management API functions
 export const updateHomeWeeklyQuotaAPI = (
   homeId: string,
@@ -619,24 +653,64 @@ export const updateHomeWeeklyQuotaAPI = (
 ): boolean => {
   const home = HOMES.find((home) => home.id === homeId);
   if (!home) return false;
-
   home.weeklyPointQuota = weeklyPointQuota;
   return true;
 };
-
 export const leaveHomeAPI = (userEmail: string, homeId: string): boolean => {
   const user = getUserByEmailAPI(userEmail);
   const home = getHomeByIdAPI(homeId);
-
   if (!user || !home) return false;
-
   // Remove home from user's homeIDs
   user.homeIDs = user.homeIDs.filter((id) => id !== homeId);
-
   // Remove user's points from home
   if (home.userPoints[userEmail]) {
     delete home.userPoints[userEmail];
   }
-
   return true;
 };
+// Dispute functions
+export const getActiveDisputesAPI = (): Dispute[] => {
+  return DISPUTES.filter((dispute) => dispute.status === "pending");
+};
+export const approveDisputeAPI = (uuid: string): void => {
+  const dispute = DISPUTES.find((dispute) => dispute.uuid === uuid);
+  if (dispute) {
+    dispute.status = "approved";
+  }
+};
+export const rejectDisputeAPI = (uuid: string): void => {
+  const dispute = DISPUTES.find((dispute) => dispute.uuid === uuid);
+  if (dispute) {
+    dispute.status = "rejected";
+  }
+};
+export const getRecentActivitiesAPI = (): RecentActivity[] => {
+  return RECENT_ACTIVITIES;
+};
+export const createDisputeAPI = (
+  choreId: string,
+  reason: string,
+  photo?: string | null
+): Dispute | undefined => {
+  const chore = CHORES.find((chore) => chore.uuid === choreId);
+  if (!chore) {
+    console.error("Chore not found for dispute creation");
+    return;
+  }
+  const newDispute: Dispute = {
+    uuid: uuidv4(),
+    choreId,
+    choreName: chore.name,
+    choreDescription: chore.description,
+    choreIcon: chore.icon,
+    disputerEmail: getCurrentUserEmail(),
+    disputerName: getUserByEmailAPI(getCurrentUserEmail())?.name || "Unknown",
+    reason,
+    imageUrl: photo || undefined,
+    status: "pending",
+    createdAt: new Date().toISOString(),
+  };
+  DISPUTES.push(newDispute);
+  return newDispute;
+};
+
