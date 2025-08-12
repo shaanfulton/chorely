@@ -2,7 +2,7 @@ import { PointTag } from "@/components/PointTag";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { ChoreProvider } from "@/context/ChoreContext";
-import { Chore } from "@/data/mock";
+import { Chore } from "@/data/api";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { getTimeRemaining } from "@/utils/timeUtils";
 import { Link } from "expo-router";

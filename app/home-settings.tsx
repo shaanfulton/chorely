@@ -3,7 +3,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { useGlobalChores } from "@/context/ChoreContext";
-import { Home as HomeType } from "@/data/mock";
+import { Home as HomeType } from "@/data/api";
 import * as Clipboard from "expo-clipboard";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Check, Copy, Home } from "lucide-react-native";

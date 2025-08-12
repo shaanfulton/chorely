@@ -40,41 +40,47 @@ export function HomeSwitcher({ isLoading, setIsLoading }: HomeSwitcherProps) {
       <ThemedText style={styles.sectionTitle}>Switch Home</ThemedText>
       <Text style={styles.sectionDescription}>Select your current home.</Text>
       <View style={styles.homesList}>
-        {userHomes.map((home) => (
-          <TouchableOpacity
-            key={home.id}
-            style={[
-              styles.homeOption,
-              currentHome?.id === home.id && styles.homeOptionSelected,
-            ]}
-            onPress={() => handleSwitchHome(home.id)}
-            disabled={isLoading || currentHome?.id === home.id}
-          >
-            <View style={styles.homeOptionContent}>
-              <View style={styles.homeInfo}>
-                <Text
-                  style={[
-                    styles.homeOptionName,
-                    currentHome?.id === home.id &&
-                      styles.homeOptionNameSelected,
-                  ]}
+        {!userHomes ? (
+          <Text style={styles.loadingText}>Loading homes...</Text>
+        ) : userHomes.length === 0 ? (
+          <Text style={styles.noHomesText}>No homes available</Text>
+        ) : (
+          userHomes.map((home) => (
+            <TouchableOpacity
+              key={home.id}
+              style={[
+                styles.homeOption,
+                currentHome?.id === home.id && styles.homeOptionSelected,
+              ]}
+              onPress={() => handleSwitchHome(home.id)}
+              disabled={isLoading || currentHome?.id === home.id}
+            >
+              <View style={styles.homeOptionContent}>
+                <View style={styles.homeInfo}>
+                  <Text
+                    style={[
+                      styles.homeOptionName,
+                      currentHome?.id === home.id &&
+                        styles.homeOptionNameSelected,
+                    ]}
+                  >
+                    {home.name}
+                  </Text>
+                  {currentHome?.id === home.id && (
+                    <Text style={styles.currentLabel}>Current</Text>
+                  )}
+                </View>
+                <TouchableOpacity
+                  style={styles.settingsButton}
+                  onPress={() => handleHomeSettings(home.id)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  {home.name}
-                </Text>
-                {currentHome?.id === home.id && (
-                  <Text style={styles.currentLabel}>Current</Text>
-                )}
+                  <MoreHorizontal size={20} color="#666" />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                style={styles.settingsButton}
-                onPress={() => handleHomeSettings(home.id)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <MoreHorizontal size={20} color="#666" />
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          ))
+        )}
       </View>
     </View>
   );
@@ -135,5 +141,17 @@ const styles = StyleSheet.create({
     color: "#007AFF",
     fontWeight: "600",
     marginTop: 4,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    padding: 16,
+  },
+  noHomesText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    padding: 16,
   },
 });

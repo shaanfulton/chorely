@@ -1,3 +1,13 @@
+Backend integration
+
+- Set API base URL at runtime using Expo env var: add to your .env or start command
+
+```
+EXPO_PUBLIC_API_BASE=http://localhost:4000
+```
+
+- The frontend now calls the real backend via `data/api.ts`. To switch back to mocks, revert imports to `@/data/mock` and remove `EXPO_PUBLIC_API_BASE`.
+
 # Welcome to your Expo app 👋
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).

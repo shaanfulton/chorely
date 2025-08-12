@@ -1,6 +1,6 @@
 import { Colors } from "@/constants/Colors";
 import { useChecklist } from "@/context/ChecklistContext";
-import { TodoItem } from "@/data/mock";
+import { TodoItem } from "@/data/api";
 import React from "react";
 import {
   ScrollView,

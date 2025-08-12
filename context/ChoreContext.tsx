@@ -22,7 +22,7 @@ import {
   updateUserPointsAPI,
   User,
   voteForChoreAPI,
-} from "@/data/mock";
+} from "@/data/api";
 import React, {
   createContext,
   ReactNode,
@@ -186,7 +186,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
   const loginUser = useCallback(async (email: string): Promise<boolean> => {
     try {
       setError(null);
-      const user = loginUserAPI(email);
+      const user = await loginUserAPI(email);
       if (!user) {
         setError("User not found");
         return false;
@@ -195,7 +195,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
       setCurrentUser(user);
 
       // Get user's homes
-      const homes = getUserHomesAPI(email);
+      const homes = await getUserHomesAPI(email);
       setUserHomes(homes);
 
       // Set first home as current if available
@@ -215,17 +215,17 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
     async (email: string, name: string, homeId?: string): Promise<boolean> => {
       try {
         setError(null);
-        const user = createUserAPI(email, name, homeId);
+        const user = await createUserAPI(email, name, homeId);
 
         setCurrentUser(user);
 
         // Get user's homes
-        const homes = getUserHomesAPI(email);
+        const homes = await getUserHomesAPI(email);
         setUserHomes(homes);
 
         // Set the home as current if provided, otherwise set first available
         if (homeId) {
-          const selectedHome = getHomeByIdAPI(homeId);
+          const selectedHome = await getHomeByIdAPI(homeId);
           if (selectedHome) {
             setCurrentHome(selectedHome);
           }
@@ -276,20 +276,20 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
 
     try {
       setError(null);
-      const available = getAvailableChoresAPI(currentHome.id);
-      const my = getMyChoresAPI(currentUser.email, currentHome.id);
-      const pending = getUnapprovedChoresAPI(currentHome.id);
+      const available = await getAvailableChoresAPI(currentHome.id);
+      const my = await getMyChoresAPI(currentUser.email, currentHome.id);
+      const pending = await getUnapprovedChoresAPI(currentHome.id);
 
       setAvailableChores(available);
       setMyChores(my);
       setPendingApprovalChores(pending);
 
       // Fetch points data
-      const currentUserPoints = getUserPointsAPI(
+      const currentUserPoints = await getUserPointsAPI(
         currentUser.email,
         currentHome.id
       );
-      const allPoints = getAllUserPointsAPI(currentHome.id);
+      const allPoints = await getAllUserPointsAPI(currentHome.id);
       setUserPoints(currentUserPoints);
       setAllUserPoints(allPoints);
     } catch (err) {

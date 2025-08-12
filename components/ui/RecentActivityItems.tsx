@@ -1,4 +1,4 @@
-import { RecentActivity } from "@/data/mock";
+import { RecentActivity } from "@/data/api";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { AlertTriangle } from "lucide-react-native";
 import React from "react";

@@ -1,4 +1,4 @@
-import { RecentActivity, createDisputeAPI } from "@/data/mock";
+import { RecentActivity, createDisputeAPI } from "@/data/api";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { Camera, Send, X } from "lucide-react-native";
 import React, { useState } from "react";

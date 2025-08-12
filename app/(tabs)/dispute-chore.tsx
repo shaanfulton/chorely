@@ -15,7 +15,7 @@ import {
   createDisputeAPI,
   type Dispute,
   type RecentActivity
-} from "@/data/mock";
+} from "@/data/api";
 
 export default function DisputeChoreScreen() {
   const insets = useSafeAreaInsets();

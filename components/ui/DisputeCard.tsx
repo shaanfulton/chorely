@@ -1,4 +1,4 @@
-import { Dispute } from "@/data/mock";
+import { Dispute } from "@/data/api";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { Check, X } from "lucide-react-native";
 import React from "react";

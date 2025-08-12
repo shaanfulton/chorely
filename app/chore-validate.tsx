@@ -2,7 +2,7 @@ import { Button } from "@/components/Button";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useGlobalChores } from "@/context/ChoreContext";
-import { Chore, getChoreByIdAPI } from "@/data/mock";
+import { Chore, getChoreByIdAPI } from "@/data/api";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { BadgeCheck } from "lucide-react-native";

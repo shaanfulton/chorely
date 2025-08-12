@@ -12,7 +12,7 @@ import {
   TodoItem,
   getChoreByIdAPI,
   getCurrentUserEmail,
-} from "@/data/mock";
+} from "@/data/api";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { getTimeRemaining } from "@/utils/timeUtils";
 import { useLocalSearchParams, useRouter } from "expo-router";
