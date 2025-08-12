@@ -7,17 +7,13 @@ import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { ChecklistProvider, useChecklist } from "@/context/ChecklistContext";
 import { ChoreProvider, useGlobalChores } from "@/context/ChoreContext";
-import {
-  Chore,
-  TodoItem,
-  getChoreByIdAPI,
-} from "@/data/api";
+import { Chore, TodoItem, getChoreByIdAPI } from "@/data/api";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { getTimeRemaining } from "@/utils/timeUtils";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Clock } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
-import { StyleSheet, View, Text } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
 
 function ChoreViewContent({ chore }: { chore: Chore | null }) {
   // Early return if chore is not available
@@ -40,7 +36,6 @@ function ChoreViewContent({ chore }: { chore: Chore | null }) {
     pendingApprovalChores,
   } = useGlobalChores();
 
-
   const router = useRouter();
   const currentUserEmail = currentUser?.email;
   const [isClaimingChore, setIsClaimingChore] = useState(false);
@@ -55,6 +50,27 @@ function ChoreViewContent({ chore }: { chore: Chore | null }) {
   const IconComponent = getLucideIcon(chore.icon);
   const timeRemaining = getTimeRemaining(chore.time);
   const allTasksCompleted = isAllCompleted(chore.todos.length);
+
+  // Live approval status from backend (approvalList not populated in chore rows)
+  const [isChorePending, setIsChorePending] = useState(
+    chore.status === "unapproved"
+  );
+  const [hasVoted, setHasVoted] = useState(false);
+
+  const refreshApprovalStatus = useCallback(async () => {
+    if (!chore?.uuid || !currentUser?.email) return;
+    try {
+      const status = await getChoreApprovalStatus(chore.uuid);
+      setIsChorePending(!(status?.isApproved ?? false));
+      setHasVoted(!!status?.hasVoted?.[currentUser.email]);
+    } catch (e) {
+      // keep existing state on error
+    }
+  }, [chore?.uuid, currentUser?.email, getChoreApprovalStatus]);
+
+  useEffect(() => {
+    refreshApprovalStatus();
+  }, [refreshApprovalStatus, pendingApprovalChores]);
 
   const handleClaimChore = async () => {
     try {
@@ -89,30 +105,21 @@ function ChoreViewContent({ chore }: { chore: Chore | null }) {
 
     try {
       setIsVotingChore(true);
-      
-      // Calculate current vote status from local state
-      const choreInPending = pendingApprovalChores.find(c => c.uuid === chore.uuid);
-      const hasVoted = choreInPending?.approvalList?.includes(currentUser.email) || false;
-
-
-
+      // Use derived vote state
       if (hasVoted) {
         // User has already voted, remove their vote
-
         await removeVoteForChore(chore.uuid);
       } else {
         // User hasn't voted yet, add their vote
-
         const success = await voteForChore(chore.uuid);
         // If the chore got approved (status changed), navigate back to home
         if (success) {
-          // Check if chore was moved to available (approved)
-          const choreStillPending = pendingApprovalChores.find(c => c.uuid === chore.uuid);
-          if (!choreStillPending) {
-            router.push("/");
-          }
+          const status = await getChoreApprovalStatus(chore.uuid);
+          if (status?.isApproved) router.push("/");
         }
       }
+      // Refresh local status after action
+      await refreshApprovalStatus();
     } catch (error) {
       console.error("Failed to toggle vote:", error);
     } finally {
@@ -122,19 +129,15 @@ function ChoreViewContent({ chore }: { chore: Chore | null }) {
 
   // Determine what to render based on chore ownership and status
   const getButtonContent = () => {
-    // If chore is unapproved - show voting button
-    if (chore.status === "unapproved") {
-      // Check if user has voted from local state
-      const choreInPending = pendingApprovalChores.find(c => c.uuid === chore.uuid);
-      const hasVoted = choreInPending?.approvalList?.includes(currentUser?.email || "") || false;
-      
-
-      
+    // If chore is still in pending approvals - show voting button
+    if (isChorePending) {
       return (
         <View style={{ alignItems: "center" }}>
           <Button
             title={hasVoted ? "Remove Vote" : "Vote to Approve"}
-            backgroundColor={hasVoted ? Colors.metro.orange : Colors.metro.green}
+            backgroundColor={
+              hasVoted ? Colors.metro.orange : Colors.metro.green
+            }
             loadingBackgroundColor={Colors.metro.teal}
             isLoading={isVotingChore}
             onPress={handleVoteToggle}
@@ -257,7 +260,7 @@ export default function ChoreView() {
         }
       }
     };
-    
+
     fetchChore();
   }, [uuid]);
 

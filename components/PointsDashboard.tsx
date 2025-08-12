@@ -1,5 +1,4 @@
 import { ThemedText } from "@/components/ThemedText";
-import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { useGlobalChores } from "@/context/ChoreContext";
 import React, { useState } from "react";
@@ -32,8 +31,8 @@ export function PointsDashboard() {
 
   return (
     <>
-      <TouchableOpacity 
-        style={styles.container} 
+      <TouchableOpacity
+        style={styles.container}
         onPress={() => setModalVisible(true)}
         activeOpacity={0.7}
       >
@@ -75,7 +74,7 @@ export function PointsDashboard() {
             Weekly Points
           </ThemedText>
           <ThemedText style={styles.tapHint} type="subtitle">
-            Tap to view completed chores
+            Tap for completed chores
           </ThemedText>
         </View>
       </TouchableOpacity>

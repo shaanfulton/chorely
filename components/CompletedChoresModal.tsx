@@ -1,24 +1,32 @@
-import { Chore } from "@/data/api";
 import { useGlobalChores } from "@/context/ChoreContext";
+import { Chore } from "@/data/api";
 import { getLucideIcon } from "@/utils/iconUtils";
-import { X, Camera } from "lucide-react-native";
+import { X } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
-import { Modal, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import {
+  Modal,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
-import { VerificationImageModal } from "./ui/VerificationImageModal";
+
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE || "http://localhost:4000";
 
 interface CompletedChoresModalProps {
   visible: boolean;
   onClose: () => void;
 }
 
-export function CompletedChoresModal({ visible, onClose }: CompletedChoresModalProps) {
+export function CompletedChoresModal({
+  visible,
+  onClose,
+}: CompletedChoresModalProps) {
   const { currentUser, currentHome } = useGlobalChores();
   const [completedChores, setCompletedChores] = useState<Chore[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedChore, setSelectedChore] = useState<Chore | null>(null);
-  const [showImageModal, setShowImageModal] = useState(false);
 
   useEffect(() => {
     if (visible && currentUser && currentHome) {
@@ -28,18 +36,20 @@ export function CompletedChoresModal({ visible, onClose }: CompletedChoresModalP
 
   const loadCompletedChores = async () => {
     if (!currentUser || !currentHome) return;
-    
+
     setIsLoading(true);
     try {
       // Use the activities endpoint to get recent completed chores
-      const response = await fetch(`http://10.0.0.14:4000/activities?homeId=${currentHome.id}&timeFrame=30d`);
-      const allActivities = await response.json();
-      
-      // Filter for chores completed by the current user
-      const userCompletedChores = allActivities.filter((chore: Chore) => 
-        chore.user_email === currentUser.email
+      const response = await fetch(
+        `${API_BASE}/activities?homeId=${currentHome.id}&timeFrame=30d`
       );
-      
+      const allActivities = await response.json();
+
+      // Filter for chores completed by the current user
+      const userCompletedChores = allActivities.filter(
+        (chore: Chore) => chore.user_email === currentUser.email
+      );
+
       setCompletedChores(userCompletedChores);
     } catch (error) {
       console.error("Failed to load completed chores:", error);
@@ -48,21 +58,15 @@ export function CompletedChoresModal({ visible, onClose }: CompletedChoresModalP
     }
   };
 
-  // Helper function to get user name from email
-  const getUserName = (email: string | null) => {
-    if (!email) return "Unknown User";
-    return email.split('@')[0];
-  };
-
   // Helper function to format completion date
   const formatCompletionDate = (completedAt: string | null) => {
     if (!completedAt) return "Unknown date";
     const date = new Date(completedAt);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -75,7 +79,14 @@ export function CompletedChoresModal({ visible, onClose }: CompletedChoresModalP
     >
       <ThemedView style={styles.container}>
         <View style={styles.header}>
-          <ThemedText type="title">Completed Chores</ThemedText>
+          <ThemedText
+            type="title"
+            style={styles.headerTitle}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            Completed
+          </ThemedText>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <X size={24} color="#666" />
           </TouchableOpacity>
@@ -95,63 +106,40 @@ export function CompletedChoresModal({ visible, onClose }: CompletedChoresModalP
           ) : (
             completedChores.map((chore) => {
               const IconComponent = getLucideIcon(chore.icon);
-              
+
               return (
-                <TouchableOpacity
-                  key={chore.uuid}
-                  style={styles.choreItem}
-                  onPress={() => {
-                    if (chore.photo_url) {
-                      setSelectedChore(chore);
-                      setShowImageModal(true);
-                    }
-                  }}
-                  disabled={!chore.photo_url}
-                >
+                <View key={chore.uuid} style={styles.choreItem}>
                   <View style={styles.choreHeader}>
                     <View style={styles.iconContainer}>
                       <IconComponent size={24} color="#666" />
                     </View>
                     <View style={styles.choreInfo}>
-                      <ThemedText type="defaultSemiBold" style={styles.choreName}>
+                      <ThemedText
+                        type="defaultSemiBold"
+                        style={styles.choreName}
+                      >
                         {chore.name}
                       </ThemedText>
                       <ThemedText style={styles.choreDescription}>
                         {chore.description}
                       </ThemedText>
                       <ThemedText style={styles.completionInfo}>
-                        Completed on {formatCompletionDate(chore.completed_at || chore.time)}
+                        Completed on{" "}
+                        {formatCompletionDate(chore.completed_at || chore.time)}
                       </ThemedText>
-                      {chore.photo_url && (
-                        <ThemedText style={styles.tapHint}>
-                          Tap to view verification photo
-                        </ThemedText>
-                      )}
                     </View>
                     <View style={styles.pointsContainer}>
                       <ThemedText style={styles.pointsText}>
                         +{chore.points}
                       </ThemedText>
                     </View>
-                    {chore.photo_url && (
-                      <View style={styles.cameraContainer}>
-                        <Camera size={16} color="#666" />
-                      </View>
-                    )}
                   </View>
-                </TouchableOpacity>
+                </View>
               );
             })
           )}
         </ScrollView>
       </ThemedView>
-
-      <VerificationImageModal
-        visible={showImageModal}
-        onClose={() => setShowImageModal(false)}
-        imageUrl={selectedChore?.photo_url}
-        choreName={selectedChore?.name || ""}
-      />
     </Modal>
   );
 }
@@ -167,6 +155,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 24,
     paddingTop: 20,
+  },
+  headerTitle: {
+    flex: 1,
+    flexShrink: 1,
+    marginRight: 12,
   },
   closeButton: {
     padding: 4,
@@ -246,15 +239,5 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 12,
     fontWeight: "600",
-  },
-  tapHint: {
-    fontSize: 11,
-    opacity: 0.5,
-    fontStyle: "italic",
-    marginTop: 2,
-  },
-  cameraContainer: {
-    marginLeft: 8,
-    padding: 4,
   },
 });

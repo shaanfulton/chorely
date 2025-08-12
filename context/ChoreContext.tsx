@@ -102,6 +102,16 @@ interface GlobalChoreContextType {
   availableChores: Chore[];
   myChores: Chore[];
   pendingApprovalChores: Chore[];
+  approvalStatuses: {
+    [choreUuid: string]: {
+      hasVoted: { [userEmail: string]: boolean };
+      votesNeeded: number;
+      currentVotes: number;
+      isApproved: boolean;
+      totalEligibleVoters: number;
+      voters?: string[];
+    };
+  };
   isLoading: boolean;
   isRefreshing: boolean;
   error: string | null;
@@ -140,6 +150,8 @@ interface GlobalChoreContextType {
     totalEligibleVoters: number;
     voters?: string[];
   } | null>;
+  hasUserVotedInPending: (choreUuid: string, userEmail?: string) => boolean;
+  isChorePending: (choreUuid: string) => boolean;
   createChore: (
     choreData: Omit<
       Chore,
@@ -174,6 +186,9 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
   const [pendingApprovalChores, setPendingApprovalChores] = useState<Chore[]>(
     []
   );
+  const [approvalStatuses, setApprovalStatuses] = useState<
+    GlobalChoreContextType["approvalStatuses"]
+  >({});
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -252,16 +267,16 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
     setCurrentUser(null);
     setCurrentHome(null);
     setUserHomes([]);
-    
+
     // Clear all chore state
     setAvailableChores([]);
     setMyChores([]);
     setPendingApprovalChores([]);
-    
+
     // Clear all points state
     setUserPoints(0);
     setAllUserPoints({});
-    
+
     // Clear all loading and error states
     setIsLoading(false);
     setIsRefreshing(false);
@@ -294,6 +309,33 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
       setAvailableChores(available);
       setMyChores(my);
       setPendingApprovalChores(pending);
+
+      // Preload approval statuses for pending chores for quick UI response
+      try {
+        const statusEntries = await Promise.all(
+          pending.map(async (c) => {
+            const s = await getChoreApprovalStatusAPI(c.uuid);
+            return [
+              c.uuid,
+              s
+                ? {
+                    hasVoted: s.hasVoted,
+                    votesNeeded: s.votesNeeded,
+                    currentVotes: s.currentVotes,
+                    isApproved: s.isApproved,
+                    totalEligibleVoters: s.totalEligibleVoters,
+                    voters: s.voters ?? [],
+                  }
+                : undefined,
+            ] as const;
+          })
+        );
+        const mapped: GlobalChoreContextType["approvalStatuses"] = {};
+        statusEntries.forEach(([uuid, s]) => {
+          if (s) mapped[uuid] = s;
+        });
+        setApprovalStatuses(mapped);
+      } catch {}
 
       // Fetch points data
       const currentUserPoints = await getUserPointsAPI(
@@ -423,10 +465,8 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
 
       try {
         const success = await voteForChoreAPI(choreUuid, currentUser.email);
-        if (success) {
-          // Refresh data to get updated state
-          await fetchAllData();
-        }
+        // Always refresh approval status and lists
+        await fetchAllData();
         return success;
       } catch (err) {
         setError(
@@ -444,11 +484,11 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
       if (!currentUser) return false;
 
       try {
-        const success = await removeVoteForChoreAPI(choreUuid, currentUser.email);
-        if (success) {
-          // Refresh data to get updated state
-          await fetchAllData();
-        }
+        const success = await removeVoteForChoreAPI(
+          choreUuid,
+          currentUser.email
+        );
+        await fetchAllData();
         return success;
       } catch (err) {
         setError(
@@ -462,8 +502,37 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
 
   // Get chore approval status
   const getChoreApprovalStatus = useCallback(async (choreUuid: string) => {
-    return await getChoreApprovalStatusAPI(choreUuid);
+    const status = await getChoreApprovalStatusAPI(choreUuid);
+    if (status) {
+      setApprovalStatuses((prev) => ({
+        ...prev,
+        [choreUuid]: {
+          hasVoted: status.hasVoted,
+          votesNeeded: status.votesNeeded,
+          currentVotes: status.currentVotes,
+          isApproved: status.isApproved,
+          totalEligibleVoters: status.totalEligibleVoters,
+          voters: status.voters ?? [],
+        },
+      }));
+    }
+    return status;
   }, []);
+
+  const hasUserVotedInPending = useCallback(
+    (choreUuid: string, userEmail?: string) => {
+      if (!userEmail) return false;
+      const status = approvalStatuses[choreUuid];
+      return !!status?.hasVoted?.[userEmail];
+    },
+    [approvalStatuses]
+  );
+
+  const isChorePending = useCallback(
+    (choreUuid: string) =>
+      pendingApprovalChores.some((c) => c.uuid === choreUuid),
+    [pendingApprovalChores]
+  );
 
   // Create chore with optimistic updates
   const createChore = useCallback(
@@ -515,12 +584,16 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
         const errorMessage =
           err instanceof Error ? err.message : "Failed to create chore";
         setError(errorMessage);
-        
+
         // Check if it's a home ID issue
-        if (err instanceof Error && err.message.includes('Home') && err.message.includes('does not exist')) {
+        if (
+          err instanceof Error &&
+          err.message.includes("Home") &&
+          err.message.includes("does not exist")
+        ) {
           throw new Error("Session expired. Please log out and log back in.");
         }
-        
+
         throw new Error(errorMessage);
       }
     },
@@ -720,6 +793,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
     availableChores,
     myChores,
     pendingApprovalChores,
+    approvalStatuses,
     isLoading,
     isRefreshing,
     error,
@@ -744,6 +818,8 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
     voteForChore,
     removeVoteForChore,
     getChoreApprovalStatus,
+    hasUserVotedInPending,
+    isChorePending,
     createChore,
     refreshAllData,
     clearError,

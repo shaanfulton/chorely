@@ -1,15 +1,14 @@
+import { X } from "lucide-react-native";
 import React from "react";
 import {
-  Modal,
-  View,
-  StyleSheet,
-  TouchableOpacity,
   Dimensions,
   Image,
+  Modal,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { ThemedText } from "./ThemedText";
-import { ThemedView } from "./ThemedView";
-import { X } from "lucide-react-native";
 
 interface VerificationImageModalProps {
   visible: boolean;
@@ -40,14 +39,19 @@ export function VerificationImageModal({
       <View style={styles.overlay}>
         <View style={styles.modalContainer}>
           <View style={styles.header}>
-            <ThemedText type="defaultSemiBold" style={styles.title}>
+            <ThemedText
+              type="defaultSemiBold"
+              style={styles.title}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               {choreName} - Verification
             </ThemedText>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <X size={24} color="#666" />
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.imageContainer}>
             <Image
               source={{ uri: imageUrl }}
@@ -55,7 +59,7 @@ export function VerificationImageModal({
               resizeMode="contain"
             />
           </View>
-          
+
           <ThemedText style={styles.caption}>
             Verification photo for completed chore
           </ThemedText>
@@ -87,6 +91,8 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
+    flexShrink: 1,
+    marginRight: 12,
     fontSize: 18,
   },
   closeButton: {
