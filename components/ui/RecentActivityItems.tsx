@@ -2,10 +2,11 @@ import { Chore } from "@/data/api";
 import { useGlobalChores } from "@/context/ChoreContext";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { AlertTriangle } from "lucide-react-native";
-import React from "react";
+import React, { useState } from "react";
 import { StyleSheet, TouchableOpacity, View, Animated } from "react-native";
 import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
+import { VerificationImageModal } from "./VerificationImageModal";
 
 
 interface RecentActivityItemProps {
@@ -18,6 +19,7 @@ interface RecentActivityItemProps {
 export function RecentActivityItem({ activity, onDispute, slideAnimation }: RecentActivityItemProps) {
  const { currentUser } = useGlobalChores();
  const IconComponent = getLucideIcon(activity.icon);
+ const [showImageModal, setShowImageModal] = useState(false);
 
  // Helper function to get user name from email
  const getUserName = (email: string | null) => {
@@ -32,33 +34,59 @@ export function RecentActivityItem({ activity, onDispute, slideAnimation }: Rece
  } : {};
 
  return (
-   <Animated.View style={[styles.container, containerStyle]}>
-     <View style={styles.header}>
-       <View style={styles.iconContainer}>
-         <IconComponent size={20} color="#666" />
-       </View>
-       <View style={styles.content}>
-         <ThemedText type="defaultSemiBold">{activity.name}</ThemedText>
-         <ThemedText style={styles.description}>
-           {activity.description}
-         </ThemedText>
-         <ThemedText style={styles.userName}>
-           Completed by {activity.user_email === currentUser?.email ? "you" : getUserName(activity.user_email)}
-         </ThemedText>
-       </View>
-     </View>
+   <>
+     <TouchableOpacity
+       onPress={() => {
+         if (activity.photo_url) {
+           setShowImageModal(true);
+         }
+       }}
+       disabled={!activity.photo_url}
+     >
+       <Animated.View style={[styles.container, containerStyle]}>
+         <View style={styles.header}>
+           <View style={styles.iconContainer}>
+             <IconComponent size={20} color="#666" />
+           </View>
+           <View style={styles.content}>
+             <ThemedText type="defaultSemiBold">{activity.name}</ThemedText>
+             <ThemedText style={styles.description}>
+               {activity.description}
+             </ThemedText>
+             <ThemedText style={styles.userName}>
+               Completed by {activity.user_email === currentUser?.email ? "you" : getUserName(activity.user_email)}
+             </ThemedText>
+             {activity.photo_url && (
+               <ThemedText style={styles.tapHint}>
+                 Tap to view verification photo
+               </ThemedText>
+             )}
+           </View>
+         </View>
 
-     {/* Only show dispute button for completed chores that the current user didn't complete */}
-     {activity.status === "complete" && activity.user_email !== currentUser?.email && (
-       <TouchableOpacity
-         style={styles.disputeButton}
-         onPress={() => onDispute(activity)}
-       >
-         <AlertTriangle size={16} color="#fff" />
-         <ThemedText style={styles.disputeButtonText}>Dispute</ThemedText>
-       </TouchableOpacity>
-     )}
-   </Animated.View>
+         {/* Only show dispute button for completed chores that the current user didn't complete */}
+         {activity.status === "complete" && activity.user_email !== currentUser?.email && (
+           <TouchableOpacity
+             style={styles.disputeButton}
+             onPress={(e) => {
+               e.stopPropagation();
+               onDispute(activity);
+             }}
+           >
+             <AlertTriangle size={16} color="#fff" />
+             <ThemedText style={styles.disputeButtonText}>Dispute</ThemedText>
+           </TouchableOpacity>
+         )}
+       </Animated.View>
+     </TouchableOpacity>
+
+     <VerificationImageModal
+       visible={showImageModal}
+       onClose={() => setShowImageModal(false)}
+       imageUrl={activity.photo_url}
+       choreName={activity.name}
+     />
+   </>
  );
 }
 
@@ -107,6 +135,12 @@ const styles = StyleSheet.create({
  userName: {
    fontSize: 12,
    opacity: 0.6,
+ },
+ tapHint: {
+   fontSize: 11,
+   opacity: 0.5,
+   fontStyle: "italic",
+   marginTop: 2,
  },
  disputeButton: {
    flexDirection: "row",

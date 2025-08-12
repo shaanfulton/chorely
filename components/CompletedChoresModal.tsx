@@ -1,11 +1,12 @@
 import { Chore } from "@/data/api";
 import { useGlobalChores } from "@/context/ChoreContext";
 import { getLucideIcon } from "@/utils/iconUtils";
-import { X } from "lucide-react-native";
+import { X, Camera } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import { Modal, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
+import { VerificationImageModal } from "./ui/VerificationImageModal";
 
 interface CompletedChoresModalProps {
   visible: boolean;
@@ -16,6 +17,8 @@ export function CompletedChoresModal({ visible, onClose }: CompletedChoresModalP
   const { currentUser, currentHome } = useGlobalChores();
   const [completedChores, setCompletedChores] = useState<Chore[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedChore, setSelectedChore] = useState<Chore | null>(null);
+  const [showImageModal, setShowImageModal] = useState(false);
 
   useEffect(() => {
     if (visible && currentUser && currentHome) {
@@ -94,7 +97,17 @@ export function CompletedChoresModal({ visible, onClose }: CompletedChoresModalP
               const IconComponent = getLucideIcon(chore.icon);
               
               return (
-                <View key={chore.uuid} style={styles.choreItem}>
+                <TouchableOpacity
+                  key={chore.uuid}
+                  style={styles.choreItem}
+                  onPress={() => {
+                    if (chore.photo_url) {
+                      setSelectedChore(chore);
+                      setShowImageModal(true);
+                    }
+                  }}
+                  disabled={!chore.photo_url}
+                >
                   <View style={styles.choreHeader}>
                     <View style={styles.iconContainer}>
                       <IconComponent size={24} color="#666" />
@@ -109,19 +122,36 @@ export function CompletedChoresModal({ visible, onClose }: CompletedChoresModalP
                       <ThemedText style={styles.completionInfo}>
                         Completed on {formatCompletionDate(chore.completed_at || chore.time)}
                       </ThemedText>
+                      {chore.photo_url && (
+                        <ThemedText style={styles.tapHint}>
+                          Tap to view verification photo
+                        </ThemedText>
+                      )}
                     </View>
                     <View style={styles.pointsContainer}>
                       <ThemedText style={styles.pointsText}>
                         +{chore.points}
                       </ThemedText>
                     </View>
+                    {chore.photo_url && (
+                      <View style={styles.cameraContainer}>
+                        <Camera size={16} color="#666" />
+                      </View>
+                    )}
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })
           )}
         </ScrollView>
       </ThemedView>
+
+      <VerificationImageModal
+        visible={showImageModal}
+        onClose={() => setShowImageModal(false)}
+        imageUrl={selectedChore?.photo_url}
+        choreName={selectedChore?.name || ""}
+      />
     </Modal>
   );
 }
@@ -216,5 +246,15 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 12,
     fontWeight: "600",
+  },
+  tapHint: {
+    fontSize: 11,
+    opacity: 0.5,
+    fontStyle: "italic",
+    marginTop: 2,
+  },
+  cameraContainer: {
+    marginLeft: 8,
+    padding: 4,
   },
 });

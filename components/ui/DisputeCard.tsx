@@ -98,13 +98,10 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
         if (error instanceof Error && error.message.includes("Dispute not found")) {
           await resolveFromBackendRow();
         } else if (error instanceof Error && error.message.includes("Network request failed")) {
-          // Network error - don't clear the vote status, just log it
-          console.warn("Network error loading dispute vote data, will retry:", error.message);
+          // Network error - don't clear the vote status, just continue
           // Don't clear voteStatus, userVote, or userVoteDisplay on network errors
           // The canVote state should already be set correctly from initialization
         } else {
-          // Log other errors
-          console.error("Failed to load dispute vote data:", error);
           // Keep current UI instead of neutering the card
         }
       }
@@ -176,11 +173,9 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
           await resolveFromBackendRow();
           return;
         } else if (error instanceof Error && error.message.includes("Network request failed")) {
-          // Network error - don't update status, just log it
-          console.warn("Network error reloading dispute vote status:", error.message);
+          // Network error - don't update status, just continue
           return;
         } else {
-          console.error("Failed to reload dispute vote status:", error);
           return;
         }
       }
@@ -235,10 +230,8 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
         setVoteStatus(prevStatus || null);
       }
       if (error instanceof Error && error.message.includes("Network request failed")) {
-        console.warn("Network error voting on dispute:", error.message);
         Alert.alert("Network Error", "Please check your connection and try again.");
       } else {
-        console.error("Failed to vote on dispute:", error);
         Alert.alert("Error", "Failed to vote on dispute. Please try again.");
       }
     } finally {

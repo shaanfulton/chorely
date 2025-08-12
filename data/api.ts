@@ -37,6 +37,7 @@ export interface Chore {
   approvalList: string[];
   completed_at?: string | null;
   claimed_at?: string | null;
+  photo_url?: string | null;
 }
 
 export interface Dispute {
@@ -48,7 +49,7 @@ export interface Dispute {
   disputerEmail: string;
   disputerName: string;
   reason: string;
-  imageUrl?: string;
+  imageUrl?: string; // dispute-provided image
   status: "pending" | "approved" | "rejected";
   createdAt: string;
   claimedByEmail: string; // Email of the user who claimed the chore (required)
@@ -59,11 +60,11 @@ export interface Dispute {
 // Helpers
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`;
-  console.log("Making request to:", url);
-  const res = await fetch(url, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
-  });
+  const isFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
+  const headers = isFormData
+    ? (init?.headers || {})
+    : { "Content-Type": "application/json", ...(init?.headers || {}) };
+  const res = await fetch(url, { ...init, headers });
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
     try {
@@ -78,6 +79,12 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 function mapChoreRow(row: any): Chore {
+  // Normalize photo_url to absolute URL if it's relative
+  let photoUrl = row.photo_url;
+  if (photoUrl && photoUrl.startsWith("/")) {
+    photoUrl = `${API_BASE}${photoUrl}`;
+  }
+  
   return {
     uuid: row.uuid,
     name: row.name,
@@ -92,6 +99,7 @@ function mapChoreRow(row: any): Chore {
     approvalList: [],
     completed_at: row.completed_at,
     claimed_at: row.claimed_at,
+    photo_url: photoUrl,
   };
 }
 
@@ -388,6 +396,12 @@ export async function getActiveDisputesAPI(): Promise<Dispute[]> {
     const choreDescription = d.chore_description ?? d.choreDescription;
     const choreIcon = d.chore_icon ?? d.choreIcon ?? "package";
     const claimedByEmail = d.chore_user_email ?? d.claimedByEmail ?? "";
+    const chorePhoto = d.chore_photo_url ?? d.chorePhotoUrl;
+    // Normalize image URL: prefer dispute image; if relative, prefix with API_BASE
+    let imageUrl: string | undefined = d.image_url || chorePhoto || undefined;
+    if (imageUrl && imageUrl.startsWith("/")) {
+      imageUrl = `${API_BASE}${imageUrl}`;
+    }
     return {
       uuid: d.uuid,
       choreId: d.chore_id,
@@ -397,7 +411,7 @@ export async function getActiveDisputesAPI(): Promise<Dispute[]> {
       disputerEmail: d.disputer_email,
       disputerName: inferUserNameFromEmail(d.disputer_email),
       reason: d.reason,
-      imageUrl: d.image_url || undefined,
+      imageUrl,
       status: d.status,
       createdAt: d.created_at || new Date().toISOString(),
       claimedByEmail,
@@ -484,21 +498,30 @@ export async function getRecentActivitiesAPI(params?: { homeId?: string; timeFra
   if (params?.homeId) q.set("homeId", params.homeId);
   if (params?.timeFrame) q.set("timeFrame", params.timeFrame);
   const rows = await http<any[]>(`/activities${q.toString() ? `?${q.toString()}` : ""}`);
-  return rows.map((r) => ({
-    uuid: r.uuid,
-    name: r.name,
-    description: r.description,
-    icon: r.icon,
-    points: r.points,
-    time: r.time,
-    status: r.status,
-    user_email: r.user_email,
-    homeID: r.home_id,
-    todos: r.todos || [],
-    approvalList: [],
-    completed_at: r.completed_at,
-    claimed_at: r.claimed_at,
-  }));
+  return rows.map((r) => {
+    // Normalize photo_url to absolute URL if it's relative
+    let photoUrl = r.photo_url;
+    if (photoUrl && photoUrl.startsWith("/")) {
+      photoUrl = `${API_BASE}${photoUrl}`;
+    }
+    
+    return {
+      uuid: r.uuid,
+      name: r.name,
+      description: r.description,
+      icon: r.icon,
+      points: r.points,
+      time: r.time,
+      status: r.status,
+      user_email: r.user_email,
+      homeID: r.home_id,
+      todos: r.todos || [],
+      approvalList: [],
+      completed_at: r.completed_at,
+      claimed_at: r.claimed_at,
+      photo_url: photoUrl,
+    };
+  });
 }
 
 export async function createDisputeAPI(
@@ -510,20 +533,48 @@ export async function createDisputeAPI(
   if (!disputerEmail) {
     throw new Error("Disputer email is required");
   }
-  
   try {
-    const row = await http<any>(`/disputes`, {
-      method: "POST",
-      body: JSON.stringify({
-        choreId,
-        reason,
-        imageUrl: photo ?? undefined,
-        disputerEmail,
-      }),
-    });
+    let row: any;
+    if (photo) {
+      const form = new FormData();
+      form.append("choreId", choreId);
+      form.append("reason", reason);
+      form.append("disputerEmail", disputerEmail);
+      // Attach image file
+      form.append("image", {
+        uri: photo,
+        name: "dispute.jpg",
+        type: "image/jpeg",
+      } as any);
+      const res = await fetch(`${API_BASE}/disputes`, {
+        method: "POST",
+        body: form,
+      });
+      if (!res.ok) {
+        let message = `HTTP ${res.status}`;
+        try {
+          const j = (await res.json()) as any;
+          if (j && j.error) message = j.error;
+        } catch {}
+        throw new Error(message);
+      }
+      row = await res.json();
+    } else {
+      // No photo; send JSON
+      row = await http<any>(`/disputes`, {
+        method: "POST",
+        body: JSON.stringify({ choreId, reason, disputerEmail }),
+      });
+    }
+
     const chore = await getChoreByIdAPI(choreId);
     if (!chore?.user_email) {
       throw new Error(`Chore ${choreId} has no assigned user, cannot create dispute`);
+    }
+    // Normalize returned image URL if relative
+    let imageUrl: string | undefined = row.image_url || undefined;
+    if (imageUrl && imageUrl.startsWith("/")) {
+      imageUrl = `${API_BASE}${imageUrl}`;
     }
     return {
       uuid: row.uuid,
@@ -534,13 +585,12 @@ export async function createDisputeAPI(
       disputerEmail: row.disputer_email,
       disputerName: inferUserNameFromEmail(row.disputer_email),
       reason: row.reason,
-      imageUrl: row.image_url || undefined,
+      imageUrl,
       status: row.status,
       createdAt: row.created_at || new Date().toISOString(),
       claimedByEmail: chore.user_email,
     };
   } catch (error) {
-    // Check if it's a home ID issue
     if (error instanceof Error && error.message.includes('Home') && error.message.includes('does not exist')) {
       throw new Error("Session expired. Please log out and log back in.");
     }

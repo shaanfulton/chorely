@@ -54,13 +54,15 @@ export function MyChoreList() {
       <ThemedText type="subtitle">My Chores</ThemedText>
       {myChores.map((chore) => (
         <ChoreListItem key={chore.uuid} chore={chore}>
-          <Button
-            title="Verify"
-            backgroundColor={Colors.metro.blue}
-            isLoading={navigatingChoreId === chore.uuid}
-            onPress={() => handleVerifyChore(chore)}
-            size="small"
-          />
+          {chore.status === "claimed" ? (
+            <Button
+              title="Verify"
+              backgroundColor={Colors.metro.blue}
+              isLoading={navigatingChoreId === chore.uuid}
+              onPress={() => handleVerifyChore(chore)}
+              size="small"
+            />
+          ) : null}
         </ChoreListItem>
       ))}
     </View>
