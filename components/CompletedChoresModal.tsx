@@ -107,7 +107,7 @@ export function CompletedChoresModal({ visible, onClose }: CompletedChoresModalP
                         {chore.description}
                       </ThemedText>
                       <ThemedText style={styles.completionInfo}>
-                        Completed on {formatCompletionDate(chore.completed_at)}
+                        Completed on {formatCompletionDate(chore.completed_at || chore.time)}
                       </ThemedText>
                     </View>
                     <View style={styles.pointsContainer}>

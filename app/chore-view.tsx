@@ -40,15 +40,7 @@ function ChoreViewContent({ chore }: { chore: Chore | null }) {
     pendingApprovalChores,
   } = useGlobalChores();
 
-  console.log("ChoreViewContent render:", {
-    choreUuid: chore.uuid,
-    choreStatus: chore.status,
-    pendingApprovalChoresCount: pendingApprovalChores.length,
-    pendingApprovalChores: pendingApprovalChores.map(c => ({
-      uuid: c.uuid,
-      approvalList: c.approvalList
-    }))
-  });
+
   const router = useRouter();
   const currentUserEmail = currentUser?.email;
   const [isClaimingChore, setIsClaimingChore] = useState(false);
@@ -102,21 +94,15 @@ function ChoreViewContent({ chore }: { chore: Chore | null }) {
       const choreInPending = pendingApprovalChores.find(c => c.uuid === chore.uuid);
       const hasVoted = choreInPending?.approvalList?.includes(currentUser.email) || false;
 
-      console.log("handleVoteToggle called:", {
-        choreUuid: chore.uuid,
-        choreInPending: !!choreInPending,
-        approvalList: choreInPending?.approvalList,
-        currentUserEmail: currentUser.email,
-        hasVoted
-      });
+
 
       if (hasVoted) {
         // User has already voted, remove their vote
-        console.log("Removing vote for chore:", chore.uuid);
+
         await removeVoteForChore(chore.uuid);
       } else {
         // User hasn't voted yet, add their vote
-        console.log("Adding vote for chore:", chore.uuid);
+
         const success = await voteForChore(chore.uuid);
         // If the chore got approved (status changed), navigate back to home
         if (success) {
@@ -142,14 +128,7 @@ function ChoreViewContent({ chore }: { chore: Chore | null }) {
       const choreInPending = pendingApprovalChores.find(c => c.uuid === chore.uuid);
       const hasVoted = choreInPending?.approvalList?.includes(currentUser?.email || "") || false;
       
-      console.log("Button state for chore:", chore.uuid, {
-        choreInPending: !!choreInPending,
-        approvalList: choreInPending?.approvalList,
-        currentUserEmail: currentUser?.email,
-        hasVoted,
-        buttonTitle: hasVoted ? "Remove Vote" : "Vote to Approve",
-        buttonColor: hasVoted ? "orange" : "green"
-      });
+
       
       return (
         <View style={{ alignItems: "center" }}>

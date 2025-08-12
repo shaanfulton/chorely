@@ -132,12 +132,14 @@ interface GlobalChoreContextType {
   completeChore: (choreUuid: string) => Promise<void>;
   voteForChore: (choreUuid: string) => Promise<boolean>;
   removeVoteForChore: (choreUuid: string) => Promise<boolean>;
-  getChoreApprovalStatus: (choreUuid: string) => {
+  getChoreApprovalStatus: (choreUuid: string) => Promise<{
     hasVoted: { [userEmail: string]: boolean };
     votesNeeded: number;
     currentVotes: number;
     isApproved: boolean;
-  } | null;
+    totalEligibleVoters: number;
+    voters?: string[];
+  } | null>;
   createChore: (
     choreData: Omit<
       Chore,
@@ -246,14 +248,23 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
 
   // Logout user
   const logoutUser = useCallback(() => {
+    // Clear all user state
     setCurrentUser(null);
     setCurrentHome(null);
     setUserHomes([]);
+    
+    // Clear all chore state
     setAvailableChores([]);
     setMyChores([]);
     setPendingApprovalChores([]);
+    
+    // Clear all points state
     setUserPoints(0);
     setAllUserPoints({});
+    
+    // Clear all loading and error states
+    setIsLoading(false);
+    setIsRefreshing(false);
     setError(null);
   }, []);
 
@@ -504,6 +515,12 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
         const errorMessage =
           err instanceof Error ? err.message : "Failed to create chore";
         setError(errorMessage);
+        
+        // Check if it's a home ID issue
+        if (err instanceof Error && err.message.includes('Home') && err.message.includes('does not exist')) {
+          throw new Error("Session expired. Please log out and log back in.");
+        }
+        
         throw new Error(errorMessage);
       }
     },

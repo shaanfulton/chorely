@@ -64,12 +64,7 @@ export function ChoreApprovalList() {
       const approvalStatus = approvalStatuses[choreId];
       const userHasVoted = approvalStatus?.hasVoted?.[currentUser.email] === true;
 
-      console.log("handleVoteToggle:", {
-        choreId,
-        approvalStatus,
-        currentUserEmail: currentUser.email,
-        userHasVoted,
-      });
+
 
       if (userHasVoted) {
         // User has already voted, remove their vote
@@ -99,13 +94,7 @@ export function ChoreApprovalList() {
           ? `${approvalStatus.currentVotes}/${approvalStatus.totalEligibleVoters} votes`
           : "";
 
-        console.log("ChoreApprovalList render:", {
-          choreUuid: chore.uuid,
-          approvalStatus,
-          currentUserEmail: currentUser?.email,
-          hasUserVoted,
-          hasVoted: approvalStatus?.hasVoted,
-        });
+
 
         return (
           <ApprovalListItem key={chore.uuid} chore={chore}>

@@ -3,7 +3,7 @@ import { useGlobalChores } from "@/context/ChoreContext";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { AlertTriangle } from "lucide-react-native";
 import React from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { StyleSheet, TouchableOpacity, View, Animated } from "react-native";
 import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
 
@@ -11,10 +11,11 @@ import { ThemedView } from "./ThemedView";
 interface RecentActivityItemProps {
  activity: Chore;
  onDispute: (activity: Chore) => void;
+ slideAnimation?: Animated.Value;
 }
 
 
-export function RecentActivityItem({ activity, onDispute }: RecentActivityItemProps) {
+export function RecentActivityItem({ activity, onDispute, slideAnimation }: RecentActivityItemProps) {
  const { currentUser } = useGlobalChores();
  const IconComponent = getLucideIcon(activity.icon);
 
@@ -24,8 +25,14 @@ export function RecentActivityItem({ activity, onDispute }: RecentActivityItemPr
    return email.split('@')[0];
  };
 
+ const containerStyle = slideAnimation ? {
+   transform: [{
+     translateY: slideAnimation
+   }]
+ } : {};
+
  return (
-   <ThemedView style={styles.container}>
+   <Animated.View style={[styles.container, containerStyle]}>
      <View style={styles.header}>
        <View style={styles.iconContainer}>
          <IconComponent size={20} color="#666" />
@@ -51,7 +58,7 @@ export function RecentActivityItem({ activity, onDispute }: RecentActivityItemPr
          <ThemedText style={styles.disputeButtonText}>Dispute</ThemedText>
        </TouchableOpacity>
      )}
-   </ThemedView>
+   </Animated.View>
  );
 }
 

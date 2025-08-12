@@ -101,13 +101,6 @@ export default function ChoreValidate() {
           // measure image
           RNImage.getSize(asset.uri, (w: number, h: number) => {
             setNaturalSize({ width: w, height: h });
-            const s = getCropBoxSize();
-                      const initial = Math.max(s / w, s / h);
-                      minScaleRef.current = initial;
-                      setBaseScale(initial);
-                      setPinchScale(1);
-                      setBaseTranslate({ x: 0, y: 0 });
-                      setGestureTranslate({ x: 0, y: 0 });
           }, () => {});
           setIsAnimating(false);
           return; // Wait for user to confirm

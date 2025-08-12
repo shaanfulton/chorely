@@ -1,4 +1,4 @@
-// Lightweight API client that mirrors the mock.ts surface but calls the real backend
+// Lightweight API client that calls the real backend
 // Base URL: configure with EXPO_PUBLIC_API_BASE; defaults to http://localhost:4000
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE || "http://localhost:4000";
@@ -35,6 +35,8 @@ export interface Chore {
   homeID: string;
   points: number;
   approvalList: string[];
+  completed_at?: string | null;
+  claimed_at?: string | null;
 }
 
 export interface Dispute {
@@ -88,6 +90,8 @@ function mapChoreRow(row: any): Chore {
     points: row.points,
     todos: [],
     approvalList: [],
+    completed_at: row.completed_at,
+    claimed_at: row.claimed_at,
   };
 }
 
@@ -218,8 +222,16 @@ export async function createChoreAPI(
   const row = await http<any>(`/chores`, { method: "POST", body: JSON.stringify(payload) });
   const chore = mapChoreRow(row);
   try {
-    const todos = await getTodoItemsForChore(chore.uuid);
-    chore.todos = todos;
+    // Try to fetch generated todos; if async generation hasn't finished yet, retry briefly
+    const tryFetchTodos = async () => {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const todos = await getTodoItemsForChore(chore.uuid);
+        if (todos && todos.length > 0) return todos;
+        await new Promise((resolve) => setTimeout(resolve, 350));
+      }
+      return [] as TodoItem[];
+    };
+    chore.todos = await tryFetchTodos();
   } catch {}
   return chore;
 }
@@ -370,30 +382,27 @@ export async function generateTodosForChoreAPI(choreName: string, choreDescripti
 // Disputes & Activity
 export async function getActiveDisputesAPI(): Promise<Dispute[]> {
   const rows = await http<any[]>(`/disputes?status=pending`);
-  // hydrate chore info
-  const enriched = await Promise.all(
-    rows.map(async (d) => {
-      const chore = await getChoreByIdAPI(d.chore_id);
-      if (!chore?.user_email) {
-        throw new Error(`Chore ${d.chore_id} has no assigned user, cannot create dispute`);
-      }
-      return {
-        uuid: d.uuid,
-        choreId: d.chore_id,
-        choreName: chore.name || "Chore",
-        choreDescription: chore.description || "",
-        choreIcon: chore.icon || "package",
-        disputerEmail: d.disputer_email,
-        disputerName: inferUserNameFromEmail(d.disputer_email),
-        reason: d.reason,
-        imageUrl: d.image_url || undefined,
-        status: d.status,
-        createdAt: d.created_at || new Date().toISOString(),
-        claimedByEmail: chore.user_email,
-      } as Dispute;
-    })
-  );
-  return enriched;
+  // Server now returns chore fields; keep a safe fallback for older servers
+  return rows.map((d) => {
+    const choreName = d.chore_name ?? d.choreName;
+    const choreDescription = d.chore_description ?? d.choreDescription;
+    const choreIcon = d.chore_icon ?? d.choreIcon ?? "package";
+    const claimedByEmail = d.chore_user_email ?? d.claimedByEmail ?? "";
+    return {
+      uuid: d.uuid,
+      choreId: d.chore_id,
+      choreName: choreName || "Chore",
+      choreDescription: choreDescription || "",
+      choreIcon,
+      disputerEmail: d.disputer_email,
+      disputerName: inferUserNameFromEmail(d.disputer_email),
+      reason: d.reason,
+      imageUrl: d.image_url || undefined,
+      status: d.status,
+      createdAt: d.created_at || new Date().toISOString(),
+      claimedByEmail,
+    } as Dispute;
+  });
 }
 
 export async function approveDisputeAPI(uuid: string): Promise<void> {
@@ -402,6 +411,28 @@ export async function approveDisputeAPI(uuid: string): Promise<void> {
 
 export async function rejectDisputeAPI(uuid: string): Promise<void> {
   await http(`/disputes/${encodeURIComponent(uuid)}/reject`, { method: "PATCH" });
+}
+
+// Fetch a dispute by id (to check final resolution status when vote status 404s)
+export async function getDisputeByIdAPI(uuid: string): Promise<{
+  uuid: string;
+  chore_id: string;
+  disputer_email: string;
+  reason: string;
+  image_url?: string | null;
+  status: "pending" | "approved" | "rejected";
+  created_at?: string;
+  updated_at?: string;
+} | null> {
+  try {
+    const row = await http<any>(`/disputes/${encodeURIComponent(uuid)}`);
+    return row;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("Dispute not found")) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 // Dispute voting types and interfaces
@@ -465,6 +496,8 @@ export async function getRecentActivitiesAPI(params?: { homeId?: string; timeFra
     homeID: r.home_id,
     todos: r.todos || [],
     approvalList: [],
+    completed_at: r.completed_at,
+    claimed_at: r.claimed_at,
   }));
 }
 
@@ -474,39 +507,51 @@ export async function createDisputeAPI(
   photo?: string | null,
   disputerEmail?: string
 ): Promise<Dispute | undefined> {
-  const row = await http<any>(`/disputes`, {
-    method: "POST",
-    body: JSON.stringify({
-      choreId,
-      reason,
-      imageUrl: photo ?? undefined,
-      disputerEmail: disputerEmail || "user@example.com",
-    }),
-  });
-  const chore = await getChoreByIdAPI(choreId);
-  if (!chore?.user_email) {
-    throw new Error(`Chore ${choreId} has no assigned user, cannot create dispute`);
+  if (!disputerEmail) {
+    throw new Error("Disputer email is required");
   }
-  return {
-    uuid: row.uuid,
-    choreId,
-    choreName: chore.name || "Chore",
-    choreDescription: chore.description || "",
-    choreIcon: chore.icon || "package",
-    disputerEmail: row.disputer_email,
-    disputerName: inferUserNameFromEmail(row.disputer_email),
-    reason: row.reason,
-    imageUrl: row.image_url || undefined,
-    status: row.status,
-    createdAt: row.created_at || new Date().toISOString(),
-    claimedByEmail: chore.user_email,
-  };
+  
+  try {
+    const row = await http<any>(`/disputes`, {
+      method: "POST",
+      body: JSON.stringify({
+        choreId,
+        reason,
+        imageUrl: photo ?? undefined,
+        disputerEmail,
+      }),
+    });
+    const chore = await getChoreByIdAPI(choreId);
+    if (!chore?.user_email) {
+      throw new Error(`Chore ${choreId} has no assigned user, cannot create dispute`);
+    }
+    return {
+      uuid: row.uuid,
+      choreId,
+      choreName: chore.name || "Chore",
+      choreDescription: chore.description || "",
+      choreIcon: chore.icon || "package",
+      disputerEmail: row.disputer_email,
+      disputerName: inferUserNameFromEmail(row.disputer_email),
+      reason: row.reason,
+      imageUrl: row.image_url || undefined,
+      status: row.status,
+      createdAt: row.created_at || new Date().toISOString(),
+      claimedByEmail: chore.user_email,
+    };
+  } catch (error) {
+    // Check if it's a home ID issue
+    if (error instanceof Error && error.message.includes('Home') && error.message.includes('does not exist')) {
+      throw new Error("Session expired. Please log out and log back in.");
+    }
+    throw error;
+  }
 }
 
 // Legacy helpers retained for compatibility with existing components
 export function getCurrentUserEmail(): string {
-  // Fallback for places still reading from here; prefer using context where possible
-  return "user@example.com";
+  // This function should not be used anymore - use context instead
+  throw new Error("getCurrentUserEmail() is deprecated. Use context to get current user email.");
 }
 
 export function getCurrentHomeID(): string {

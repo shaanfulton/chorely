@@ -30,10 +30,7 @@ export function MyChoreList() {
     if (navigatingChoreId) return; // guard against double taps
     if (!chore || chore.status !== "claimed") return; // only allow claimed
     try {
-      console.log("Verify from MyChoreList:", {
-        uuid: chore?.uuid,
-        status: chore?.status,
-      });
+
       setNavigatingChoreId(chore.uuid);
       router.push(`/chore-validate?uuid=${chore.uuid}`);
     } finally {

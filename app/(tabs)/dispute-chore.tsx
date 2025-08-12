@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { ScrollView, StyleSheet, Alert, RefreshControl } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { ScrollView, StyleSheet, Alert, RefreshControl, Animated, Easing } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/ThemedText";
@@ -24,47 +24,250 @@ export default function DisputeChoreScreen() {
   const [selectedActivity, setSelectedActivity] = useState<Chore | null>(null);
   const [disputeModalVisible, setDisputeModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [expandedDisputeId, setExpandedDisputeId] = useState<string | null>(null);
+  const [userVotedDisputes, setUserVotedDisputes] = useState<Set<string>>(new Set());
+  const [disputeTargetPositions, setDisputeTargetPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
+  const [activityAnimations, setActivityAnimations] = useState<Map<string, Animated.Value>>(new Map());
 
-  const loadData = async () => {
-    const disputesData = await getActiveDisputesAPI();
-    const activitiesData = await getRecentActivitiesAPI({ 
-      homeId: currentHome?.id,
-      timeFrame: "3d" 
-    });
+  const loadData = useCallback(async () => {
+    if (!currentHome?.id || loading) return;
     
-    // Filter out activities that have active disputes
-    const disputedChoreIds = disputesData.map(dispute => dispute.choreId);
-    const filteredActivities = activitiesData.filter(activity => 
-      !disputedChoreIds.includes(activity.uuid)
-    );
-    
-    setDisputes(disputesData);
-    setRecentActivities(filteredActivities);
-  };
+    setLoading(true);
+    try {
+      const disputesData = await getActiveDisputesAPI();
+      const activitiesData = await getRecentActivitiesAPI({ 
+        homeId: currentHome.id,
+        timeFrame: "3d" 
+      });
+      
+      // Filter out activities that have active disputes
+      const disputedChoreIds = disputesData.map(dispute => dispute.choreId);
+      const filteredActivities = activitiesData.filter(activity => 
+        !disputedChoreIds.includes(activity.uuid)
+      );
+      
+      setDisputes(disputesData);
+      setRecentActivities(filteredActivities);
+      
+      // Calculate target positions for rejected disputes
+      const targetPositions = new Map<string, { x: number; y: number }>();
+      
+      disputesData.forEach((dispute) => {
+        // Calculate where this dispute would appear in recent activities if rejected
+        const rejectedChore: Chore = {
+          uuid: dispute.choreId,
+          name: dispute.choreName,
+          description: dispute.choreDescription,
+          time: new Date().toISOString(),
+          icon: dispute.choreIcon,
+          user_email: dispute.claimedByEmail,
+          status: "complete",
+          todos: [],
+          homeID: currentHome?.id || "",
+          points: 0,
+          approvalList: [],
+          completed_at: new Date().toISOString(),
+          claimed_at: null,
+        };
+        
+        // Find the correct position in recent activities
+        let insertIndex = 0;
+        for (let i = 0; i < filteredActivities.length; i++) {
+          const activityTime = new Date(filteredActivities[i].completed_at || 0);
+          const rejectedTime = new Date(rejectedChore.completed_at || 0);
+          if (activityTime < rejectedTime) {
+            insertIndex = i;
+            break;
+          }
+          insertIndex = i + 1;
+        }
+        
+        // Calculate Y position: disputes section height + target position in activities
+        const disputeCardHeight = 120; // Approximate height of collapsed dispute card
+        const activityItemHeight = 80; // Approximate height of activity item
+        const sectionTitleHeight = 50; // Height of section titles
+        const padding = 20; // Container padding
+        
+        // When this dispute is resolved, there will be one fewer dispute in the list
+        const remainingDisputes = disputesData.length - 1;
+        const disputesSectionHeight = (remainingDisputes * disputeCardHeight) + sectionTitleHeight + padding;
+        
+        // Calculate the target position more precisely
+        // The dispute card should end up exactly where the new activity item will appear
+        const targetY = disputesSectionHeight + (insertIndex * activityItemHeight) + sectionTitleHeight;
+        
+        targetPositions.set(dispute.uuid, { x: 0, y: targetY });
+      });
+      
+      setDisputeTargetPositions(targetPositions);
+    } catch (error) {
+      console.error('Failed to load data:', error);
+      // Show a simple error message if the backend is down
+      if (error instanceof Error && error.message.includes('Network request failed')) {
+        Alert.alert(
+          'Connection Error',
+          'Unable to connect to the server. Please try again later.',
+          [{ text: 'OK' }]
+        );
+      } else if (error instanceof Error && error.message.includes('Home') && error.message.includes('does not exist')) {
+        // Home ID has changed, need to refresh user data
+        Alert.alert(
+          'Session Expired',
+          'Your session has expired. Please log out and log back in.',
+          [{ text: 'OK' }]
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [currentHome?.id, loading]);
 
   useEffect(() => {
-    loadData();
+    if (currentHome?.id) {
+      loadData();
+    }
+  }, [currentHome?.id]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
+
+  const handleDisputeResolved = useCallback((resolvedDisputeId: string, resolutionType: "approved" | "rejected") => {
+    // Find the resolved dispute to get its chore info
+    const resolvedDispute = disputes.find(d => d.uuid === resolvedDisputeId);
+    
+    // Immediately remove the resolved dispute from local state
+    setDisputes(prevDisputes => prevDisputes.filter(d => d.uuid !== resolvedDisputeId));
+    
+    // Reset expanded dispute if it was the one that was resolved
+    if (expandedDisputeId === resolvedDisputeId) {
+      setExpandedDisputeId(null);
+    }
+    
+    // Remove from voted disputes set
+    setUserVotedDisputes(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(resolvedDisputeId);
+      return newSet;
+    });
+    
+    // If dispute was rejected, coordinate the animation with activity items
+    if (resolutionType === "rejected" && resolvedDispute) {
+      // Create a chore object from the dispute for recent activities
+      const rejectedChore: Chore = {
+        uuid: resolvedDispute.choreId,
+        name: resolvedDispute.choreName,
+        description: resolvedDispute.choreDescription,
+        time: new Date().toISOString(), // Use current time as completion time
+        icon: resolvedDispute.choreIcon,
+        user_email: resolvedDispute.claimedByEmail,
+        status: "complete",
+        todos: [],
+        homeID: currentHome?.id || "",
+        points: 0, // Will be updated when data is reloaded
+        approvalList: [],
+        completed_at: new Date().toISOString(),
+        claimed_at: null,
+      };
+      
+      // Find the correct position to insert (after chores with later completion times)
+      let insertIndex = 0;
+      for (let i = 0; i < recentActivities.length; i++) {
+        const activityTime = new Date(recentActivities[i].completed_at || 0);
+        const rejectedTime = new Date(rejectedChore.completed_at || 0);
+        if (activityTime < rejectedTime) {
+          insertIndex = i;
+          break;
+        }
+        insertIndex = i + 1;
+      }
+      
+      // Calculate how much the dispute card should slide down
+      // It should match the cumulative movement of the activity items
+      const slideDistance = 20; // Distance for activity items to slide down
+      const itemsToMove = recentActivities.length - insertIndex;
+      const totalSlideDistance = itemsToMove * slideDistance;
+      
+      // Animate activity items that come after the insertion point
+      const newActivityAnimations = new Map(activityAnimations);
+      const activityItemHeight = 80; // Approximate height of activity item
+      
+      recentActivities.forEach((activity, index) => {
+        if (index >= insertIndex) {
+          // Create animation for items that need to slide down
+          const animValue = newActivityAnimations.get(activity.uuid) || new Animated.Value(0);
+          newActivityAnimations.set(activity.uuid, animValue);
+          
+          // Animate them down to make space
+          Animated.timing(animValue, {
+            toValue: slideDistance,
+            duration: 600,
+            useNativeDriver: true,
+            easing: Easing.linear,
+          }).start();
+        }
+      });
+      
+      setActivityAnimations(newActivityAnimations);
+      
+      // Calculate the target position for this specific dispute
+      const disputeCardHeight = 120;
+      const sectionTitleHeight = 50;
+      const padding = 20;
+      
+      // When this dispute is resolved, there will be one fewer dispute in the list
+      const remainingDisputes = disputes.length - 1;
+      const disputesSectionHeight = (remainingDisputes * disputeCardHeight) + sectionTitleHeight + padding;
+      const baseTargetY = disputesSectionHeight + (insertIndex * activityItemHeight) + sectionTitleHeight;
+      const targetY = baseTargetY + totalSlideDistance;
+      
+      // Update the target position for this specific dispute
+      setDisputeTargetPositions(prev => {
+        const newPositions = new Map(prev);
+        newPositions.set(resolvedDisputeId, { x: 0, y: targetY });
+        return newPositions;
+      });
+      
+      // Insert the rejected chore in chronological order
+      setRecentActivities(prev => {
+        const newActivities = [...prev];
+        newActivities.splice(insertIndex, 0, rejectedChore);
+        return newActivities;
+      });
+      
+      // Delay the data reload to allow the animation to complete
+      setTimeout(() => {
+        loadData();
+      }, 2000); // Wait 2 seconds for animation to complete
+    } else {
+      // For approved disputes, reload immediately
+      loadData();
+    }
+  }, [loadData, expandedDisputeId, disputes, currentHome?.id]);
+
+  const handleDisputeVoted = useCallback((disputeId: string) => {
+    // Add dispute to voted set
+    setUserVotedDisputes(prev => new Set(prev).add(disputeId));
   }, []);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadData();
-    setRefreshing(false);
-  };
+  const handleDisputeExpanded = useCallback((disputeId: string) => {
+    setExpandedDisputeId(expandedDisputeId === disputeId ? null : disputeId);
+  }, [expandedDisputeId]);
 
-  const handleDisputeResolved = () => {
-    // Reload data when a dispute is resolved
-    loadData();
-  };
-
-  const handleDisputeActivity = (activity: Chore) => {
+  const handleDisputeActivity = useCallback((activity: Chore) => {
     setSelectedActivity(activity);
     setDisputeModalVisible(true);
-  };
+  }, []);
 
-  const handleDisputeCreated = () => {
-    loadData();
-  };
+  const handleDisputeCreated = useCallback(() => {
+    // Add a small delay to prevent rapid API calls
+    setTimeout(() => {
+      loadData();
+    }, 500);
+  }, [loadData]);
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
@@ -87,13 +290,26 @@ export default function DisputeChoreScreen() {
             <ThemedText type="subtitle" style={styles.sectionTitle}>
               Active Disputes ({disputes.length})
             </ThemedText>
-            {disputes.map((dispute) => (
-              <DisputeCard
-                key={dispute.uuid}
-                dispute={dispute}
-                onDisputeResolved={handleDisputeResolved}
-              />
-            ))}
+            {disputes
+              .sort((a, b) => {
+                const aVoted = userVotedDisputes.has(a.uuid);
+                const bVoted = userVotedDisputes.has(b.uuid);
+                // Put non-voted disputes first
+                if (aVoted && !bVoted) return 1;
+                if (!aVoted && bVoted) return -1;
+                return 0;
+              })
+              .map((dispute) => (
+                <DisputeCard
+                  key={dispute.uuid}
+                  dispute={dispute}
+                  onDisputeResolved={handleDisputeResolved}
+                  onDisputeExpanded={handleDisputeExpanded}
+                  onDisputeVoted={handleDisputeVoted}
+                  expanded={expandedDisputeId === dispute.uuid}
+                  targetPosition={disputeTargetPositions.get(dispute.uuid)}
+                />
+              ))}
           </>
         )}
 
@@ -108,6 +324,7 @@ export default function DisputeChoreScreen() {
               key={activity.uuid}
               activity={activity}
               onDispute={handleDisputeActivity}
+              slideAnimation={activityAnimations.get(activity.uuid)}
             />
           ))
         ) : (

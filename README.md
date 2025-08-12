@@ -6,7 +6,7 @@ Backend integration
 EXPO_PUBLIC_API_BASE=http://localhost:4000
 ```
 
-- The frontend now calls the real backend via `data/api.ts`. To switch back to mocks, revert imports to `@/data/mock` and remove `EXPO_PUBLIC_API_BASE`.
+- The frontend calls the real backend via `data/api.ts`.
 
 # Welcome to your Expo app 👋
 

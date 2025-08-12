@@ -1,7 +1,8 @@
 import { Chore, createDisputeAPI } from "@/data/api";
+import { useGlobalChores } from "@/context/ChoreContext";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { Camera, Send, X } from "lucide-react-native";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
  Alert,
  KeyboardAvoidingView,
@@ -12,6 +13,7 @@ import {
  TextInput,
  TouchableOpacity,
  View,
+ Animated,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as Linking from "expo-linking";
@@ -35,11 +37,36 @@ export function DisputeModal({
  onClose,
  onDisputeCreated,
 }: DisputeModalProps) {
+ const { currentUser } = useGlobalChores();
  const [reason, setReason] = useState("");
  const [photo, setPhoto] = useState<string | null>(null);
  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
  const [canAskCameraPermissionAgain, setCanAskCameraPermissionAgain] = useState<boolean>(true);
  const [isTakingPhoto, setIsTakingPhoto] = useState(false);
+ const [showSuccess, setShowSuccess] = useState(false);
+ const [isClosing, setIsClosing] = useState(false);
+
+ // Animation values for the splash screen
+ const fadeAnim = useRef(new Animated.Value(0)).current;
+ const scaleAnim = useRef(new Animated.Value(0.8)).current;
+
+ // Single close handler to prevent multiple calls
+ const handleClose = () => {
+   if (isClosing) return;
+   setIsClosing(true);
+   
+   // Reset form state
+   setReason("");
+   setPhoto(null);
+   setIsTakingPhoto(false);
+   setShowSuccess(false);
+   
+   // Call the parent's onClose
+   onClose();
+   
+   // Reset closing state after a short delay
+   setTimeout(() => setIsClosing(false), 300);
+ };
 
  // Reset form when modal opens/closes
  useEffect(() => {
@@ -47,8 +74,57 @@ export function DisputeModal({
      setReason("");
      setPhoto(null);
      setIsTakingPhoto(false);
+     setShowSuccess(false);
+     setIsClosing(false);
+     // Reset animation values
+     fadeAnim.setValue(0);
+     scaleAnim.setValue(0.8);
    }
- }, [visible]);
+ }, [visible, fadeAnim, scaleAnim]);
+
+ // Auto-close success page after 1 second with animation
+ useEffect(() => {
+   if (showSuccess) {
+     // Start animation
+     Animated.parallel([
+       Animated.timing(fadeAnim, {
+         toValue: 1,
+         duration: 300,
+         useNativeDriver: true,
+       }),
+       Animated.spring(scaleAnim, {
+         toValue: 1,
+         tension: 50,
+         friction: 7,
+         useNativeDriver: true,
+       }),
+     ]).start();
+
+     const timer = setTimeout(() => {
+       // Fade out animation
+       Animated.parallel([
+         Animated.timing(fadeAnim, {
+           toValue: 0,
+           duration: 200,
+           useNativeDriver: true,
+         }),
+         Animated.timing(scaleAnim, {
+           toValue: 0.8,
+           duration: 200,
+           useNativeDriver: true,
+         }),
+       ]).start(() => {
+         setShowSuccess(false);
+         setReason("");
+         setPhoto(null);
+         onClose();
+         onDisputeCreated();
+       });
+     }, 1000);
+
+     return () => clearTimeout(timer);
+   }
+ }, [showSuccess, onClose, onDisputeCreated, fadeAnim, scaleAnim]);
 
  useEffect(() => {
    // Load existing camera permission status
@@ -121,27 +197,20 @@ export function DisputeModal({
      return;
    }
 
+   if (!currentUser?.email) {
+     Alert.alert("Error", "User not logged in");
+     return;
+   }
+
    try {
      // Create dispute with photo if available
-     await createDisputeAPI(activity.uuid, reason.trim(), photo);
+     await createDisputeAPI(activity.uuid, reason.trim(), photo, currentUser.email);
      
-     Alert.alert(
-       "Dispute Created",
-       "Your dispute has been submitted and is pending review.",
-       [
-         {
-           text: "OK",
-           onPress: () => {
-             setReason("");
-             setPhoto(null);
-             onClose();
-             onDisputeCreated();
-           },
-         },
-       ]
-     );
+     // Show success page
+     setShowSuccess(true);
    } catch (error) {
-     Alert.alert("Error", "Failed to create dispute. Please try again.");
+     const errorMessage = error instanceof Error ? error.message : "Failed to create dispute. Please try again.";
+     Alert.alert("Error", errorMessage);
    }
  };
 
@@ -157,26 +226,68 @@ export function DisputeModal({
    return email.split('@')[0];
  };
 
+ // Success page - shows confirmation that dispute was created successfully
+ if (showSuccess) {
+   return (
+     <Modal
+       visible={visible}
+       animationType="slide"
+       presentationStyle="pageSheet"
+       onRequestClose={handleClose}
+     >
+       <TouchableOpacity
+         style={styles.successContainer}
+         onPress={() => {
+           setShowSuccess(false);
+           setReason("");
+           setPhoto(null);
+           handleClose();
+           onDisputeCreated();
+         }}
+         activeOpacity={1}
+       >
+         <Animated.View
+           style={[
+             styles.successContent,
+             {
+               opacity: fadeAnim,
+               transform: [{ scale: scaleAnim }],
+             },
+           ]}
+         >
+           <ThemedText style={styles.successTitle}>Dispute Successfully Created</ThemedText>
+         </Animated.View>
+       </TouchableOpacity>
+     </Modal>
+   );
+ }
+
  return (
    <Modal
      visible={visible}
      animationType="slide"
      presentationStyle="pageSheet"
-     onRequestClose={onClose}
+     onRequestClose={handleClose}
    >
      <KeyboardAvoidingView 
        style={styles.keyboardAvoidingView}
        behavior={Platform.OS === "ios" ? "padding" : "height"}
+       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
      >
        <ThemedView style={styles.container}>
          <View style={styles.header}>
            <ThemedText type="title">Dispute Chore</ThemedText>
-           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+           <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
              <X size={24} color="#666" />
            </TouchableOpacity>
          </View>
 
-         <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+         <ScrollView 
+           style={styles.scrollContent} 
+           showsVerticalScrollIndicator={false}
+           keyboardShouldPersistTaps="handled"
+           contentContainerStyle={styles.scrollContentContainer}
+         >
            <View style={styles.choreInfo}>
              <View style={styles.iconContainer}>
                <IconComponent size={32} color="#666" />
@@ -226,38 +337,37 @@ export function DisputeModal({
                    <ThemedText style={styles.placeholderText}>No photo yet</ThemedText>
                  </View>
                )}
+               
+               {/* Overlay button on top of the photo */}
+               <TouchableOpacity 
+                 style={styles.photoButtonOverlay} 
+                 onPress={takePhoto}
+                 disabled={isTakingPhoto}
+               >
+                 <Camera size={24} color="#fff" />
+                 <ThemedText style={styles.photoButtonTextOverlay}>
+                   {isTakingPhoto ? 'Taking Photo...' : (photo ? 'Retake Photo' : 'Take Photo')}
+                 </ThemedText>
+               </TouchableOpacity>
              </View>
-
-             <TouchableOpacity 
-               style={styles.photoButton} 
-               onPress={takePhoto}
-               disabled={isTakingPhoto}
-             >
-               <Camera size={24} color="#666" />
-               <ThemedText style={styles.photoButtonText}>
-                 {isTakingPhoto ? 'Taking Photo...' : (photo ? 'Retake Photo' : 'Take Photo')}
-               </ThemedText>
-             </TouchableOpacity>
            </View>
          </ScrollView>
 
          <View style={styles.actions}>
-           <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+           <TouchableOpacity style={styles.cancelButton} onPress={handleClose}>
              <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
            </TouchableOpacity>
           
            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
              <Send size={16} color="#fff" />
              <ThemedText style={styles.submitButtonText}>Submit Dispute</ThemedText>
-                        </TouchableOpacity>
-           </View>
-         </ThemedView>
-       </KeyboardAvoidingView>
-     </Modal>
-
-
-   );
- }
+           </TouchableOpacity>
+         </View>
+       </ThemedView>
+     </KeyboardAvoidingView>
+   </Modal>
+ );
+}
 
 
 const styles = StyleSheet.create({
@@ -270,6 +380,10 @@ const styles = StyleSheet.create({
  },
  scrollContent: {
    flex: 1,
+   marginBottom: 0,
+ },
+ scrollContentContainer: {
+   flexGrow: 1,
  },
  header: {
    flexDirection: "row",
@@ -367,12 +481,32 @@ const styles = StyleSheet.create({
    color: "#666",
    fontWeight: "600",
  },
+ photoButtonOverlay: {
+   position: "absolute",
+   bottom: 16,
+   right: 16,
+   flexDirection: "row",
+   alignItems: "center",
+   justifyContent: "center",
+   backgroundColor: "rgba(0, 0, 0, 0.7)",
+   paddingVertical: 8,
+   paddingHorizontal: 12,
+   borderRadius: 20,
+   gap: 6,
+ },
+ photoButtonTextOverlay: {
+   color: "#fff",
+   fontWeight: "600",
+   fontSize: 14,
+ },
 
 
  actions: {
    flexDirection: "row",
    gap: 12,
-   marginTop: "auto",
+   paddingTop: 16,
+   paddingBottom: Platform.OS === "ios" ? 20 : 16,
+   backgroundColor: "transparent",
  },
  cancelButton: {
    flex: 1,
@@ -402,6 +536,26 @@ const styles = StyleSheet.create({
  submitButtonText: {
    color: "#fff",
    fontWeight: "600",
+ },
+ successContainer: {
+   flex: 1,
+   backgroundColor: "#E53E3E",
+   justifyContent: "center",
+   alignItems: "center",
+   padding: 40,
+   paddingTop: 80, // extra top padding to prevent text cutoff
+ },
+ successContent: {
+   alignItems: "center",
+   justifyContent: "center",
+ },
+ successTitle: {
+   color: "#fff",
+   fontSize: 28,
+   fontWeight: "bold",
+   textAlign: "center",
+   marginBottom: 40,
+   lineHeight: 36, // Add line height to make sure text is fully visible
  },
 });
 
