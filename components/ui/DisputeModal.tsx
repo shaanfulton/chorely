@@ -1,14 +1,21 @@
-import { RecentActivity, createDisputeAPI } from "@/data/mock";
+import { Chore, createDisputeAPI, getUserByEmailAPI } from "@/data/mock";
 import { getLucideIcon } from "@/utils/iconUtils";
-import { Camera, Send, X } from "lucide-react-native";
-import React, { useState } from "react";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import { AlertTriangle, Camera as CameraIcon, Send, X } from "lucide-react-native";
+import React, { useEffect, useRef, useState } from "react";
 import {
  Alert,
+ Animated,
+ Easing,
  Image,
+ KeyboardAvoidingView,
  Modal,
+ Platform,
+ ScrollView,
  StyleSheet,
  TextInput,
  TouchableOpacity,
+ TouchableWithoutFeedback,
  View,
 } from "react-native";
 import { ThemedText } from "./ThemedText";
@@ -17,7 +24,7 @@ import { ThemedView } from "./ThemedView";
 
 interface DisputeModalProps {
  visible: boolean;
- activity: RecentActivity | null;
+ activity: Chore | null;
  onClose: () => void;
  onDisputeCreated: () => void;
 }
@@ -31,65 +38,242 @@ export function DisputeModal({
 }: DisputeModalProps) {
  const [reason, setReason] = useState("");
  const [photo, setPhoto] = useState<string | null>(null);
+ const [showCamera, setShowCamera] = useState(false);
+ const [permission, requestPermission] = useCameraPermissions();
+ const textInputRef = useRef<TextInput>(null);
 
 
- const takePhoto = () => {
-   // Simulate taking a photo - in a real app, this would use expo-image-picker
-   // For now, its jsst a placeholder image
-   Alert.alert(
-     "Photo Taken",
-     "Photo functionality would be implemented with expo-image-picker. For now, using a placeholder.",
-     [
-       {
-         text: "OK",
-         onPress: () => {
-           // Simulate a photo being taken
-           setPhoto("https://via.placeholder.com/300x200/cccccc/666666?text=Photo+Evidence");
-         },
-       },
-     ]
-   );
+ const takePhoto = async () => {
+   if (!permission?.granted) {
+     const permissionResult = await requestPermission();
+     if (!permissionResult.granted) {
+       Alert.alert("Permission Required", "Camera permission is needed to take photos");
+       return;
+     }
+   }
+   setShowCamera(true);
  };
 
 
- const handleSubmit = () => {
-   if (!reason.trim()) {
-     Alert.alert("Error", "Please provide a reason for the dispute");
-     return;
+ const handlePhotoTaken = async () => {
+   try {
+     if (cameraRef.current) {
+       // Take a photo using the camera
+       const photo = await cameraRef.current.takePictureAsync({
+         quality: 0.8,
+         base64: false,
+       });
+      
+       setPhoto(photo.uri);
+       setShowCamera(false);
+     } else {
+       // Fallback to placeholder if camera ref is not available
+       setPhoto("https://picsum.photos/300/200?random=" + Date.now());
+       setShowCamera(false);
+     }
+
+
+     // Start animation sequence
+     Animated.sequence([
+       // 1. Fade in the red backdrop
+       Animated.timing(backdropOpacity, {
+         toValue: 1,
+         duration: 300,
+         useNativeDriver: true,
+       }),
+       // 2. Animate alert triangle in (slide up and fade in)
+       Animated.parallel([
+         Animated.timing(alertOpacity, {
+           toValue: 1,
+           duration: 400,
+           easing: Easing.out(Easing.ease),
+           useNativeDriver: true,
+         }),
+         Animated.spring(alertTranslateY, {
+           toValue: 0,
+           bounciness: 15,
+           useNativeDriver: true,
+         }),
+       ]),
+       // 3. Wait a moment
+       Animated.delay(800),
+       // 4. Animate alert triangle out (slide down and fade out)
+       Animated.parallel([
+         Animated.timing(alertOpacity, {
+           toValue: 0,
+           duration: 300,
+           easing: Easing.in(Easing.ease),
+           useNativeDriver: true,
+         }),
+         Animated.timing(alertTranslateY, {
+           toValue: 50,
+           duration: 300,
+           easing: Easing.in(Easing.ease),
+           useNativeDriver: true,
+         }),
+       ]),
+     ]).start();
+   } catch (error) {
+     console.error('Error capturing photo:', error);
+     Alert.alert('Error', 'Failed to capture photo');
    }
+ };
 
 
+ const [showSuccess, setShowSuccess] = useState(false);
+ const cameraRef = useRef<any>(null);
+
+
+ // Animation values
+ const backdropOpacity = useRef(new Animated.Value(0)).current;
+ const alertOpacity = useRef(new Animated.Value(0)).current;
+ const alertTranslateY = useRef(new Animated.Value(50)).current;
+
+
+ const handleSubmit = () => {
    if (!activity) {
      Alert.alert("Error", "No activity selected");
      return;
    }
 
 
-   // Create dispute with photo if available
-   createDisputeAPI(activity.choreId, reason.trim(), photo);
-  
-   Alert.alert(
-     "Dispute Created",
-     "Your dispute has been submitted and is pending review.",
-     [
-       {
-         text: "OK",
-         onPress: () => {
-           setReason("");
-           setPhoto(null);
-           onClose();
-           onDisputeCreated();
-         },
-       },
-     ]
-   );
+   if (!reason.trim()) {
+     Alert.alert(
+       "No Reason Provided",
+       "There is no reason for this dispute. Would you like to submit without a reason?",
+       [
+         { text: "Cancel", style: "cancel" },
+         {
+           text: "Submit Anyway",
+           onPress: () => {
+             console.log("Creating dispute without reason, photo:", photo);
+             createDisputeAPI(activity.uuid, "", photo);
+             setShowSuccess(true);
+           }
+         }
+       ]
+     );
+     return;
+   }
+
+
+   // Create dispute with reason and photo if available
+   console.log("Creating dispute with reason and photo:", reason.trim(), photo);
+   createDisputeAPI(activity.uuid, reason.trim(), photo);
+    // Show success page
+   setShowSuccess(true);
  };
+
+
+ const dismissKeyboard = () => {
+   textInputRef.current?.blur();
+ };
+
+
+ // Auto-close success page after 1 second
+ useEffect(() => {
+   if (showSuccess) {
+     const timer = setTimeout(() => {
+       setShowSuccess(false);
+       setReason("");
+       setPhoto(null);
+       onClose();
+       onDisputeCreated();
+     }, 1000);
+
+
+     return () => clearTimeout(timer);
+   }
+ }, [showSuccess, onClose, onDisputeCreated]);
 
 
  if (!activity) return null;
 
 
- const IconComponent = getLucideIcon(activity.choreIcon);
+ const IconComponent = getLucideIcon(activity.icon);
+ const userName = getUserByEmailAPI(activity.user_email || "")?.name || "Unknown";
+
+
+ {/* success page - shows confirmation that dispute was created successfully */}
+ {/* example: user sees red page with "dispute successfully created" message after submitting */}
+ if (showSuccess) {
+   return (
+     <Modal
+       visible={visible}
+       animationType="slide"
+       presentationStyle="pageSheet"
+       onRequestClose={onClose}
+     >
+       <TouchableOpacity
+         style={styles.successContainer}
+         onPress={() => {
+           setShowSuccess(false);
+           setReason("");
+           setPhoto(null);
+           onClose();
+           onDisputeCreated();
+         }}
+         activeOpacity={1}
+       >
+         <ThemedText style={styles.successTitle}>Dispute Successfully Created</ThemedText>
+       </TouchableOpacity>
+     </Modal>
+   );
+ }
+
+
+ {/* camera page - allows users to take a photo as evidence for their dispute */}
+ if (showCamera) {
+   return (
+     <Modal
+       visible={visible}
+       animationType="slide"
+       presentationStyle="pageSheet"
+       onRequestClose={() => setShowCamera(false)}
+     >
+       <View style={styles.cameraContainer}>
+         <ThemedText style={styles.cameraTitle}>Take a photo to dispute</ThemedText>
+         <View style={styles.cameraViewContainer}>
+           <CameraView
+             ref={cameraRef}
+             style={styles.camera}
+           />
+         </View>
+         <TouchableOpacity
+           style={styles.cameraButton}
+           onPress={handlePhotoTaken}
+         >
+           <ThemedText style={styles.cameraButtonText}>Take Photo</ThemedText>
+         </TouchableOpacity>
+
+
+         {/* Backdrop */}
+         <Animated.View
+           style={[styles.backdrop, { opacity: backdropOpacity }]}
+           pointerEvents="none"
+         />
+
+
+         {/*dispute created animation*/}
+         <Animated.View
+           style={[
+             styles.alertContainer,
+             {
+               opacity: alertOpacity,
+               transform: [{ translateY: alertTranslateY }],
+             },
+           ]}
+           pointerEvents="none"
+         >
+           <AlertTriangle size={100} color="#E53E3E" strokeWidth={2} />
+           <ThemedText style={styles.disputeCreatedText}>
+             Dispute Created
+           </ThemedText>
+         </Animated.View>
+       </View>
+     </Modal>
+   );
+ }
 
 
  return (
@@ -99,89 +283,107 @@ export function DisputeModal({
      presentationStyle="pageSheet"
      onRequestClose={onClose}
    >
-     <ThemedView style={styles.container}>
-       <View style={styles.header}>
-         <ThemedText type="title">Dispute Chore</ThemedText>
-         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-           <X size={24} color="#666" />
-         </TouchableOpacity>
-       </View>
-
-
-       <View style={styles.choreInfo}>
-         <View style={styles.iconContainer}>
-           <IconComponent size={32} color="#666" />
-         </View>
-         <View style={styles.choreDetails}>
-           <ThemedText type="defaultSemiBold">{activity.choreName}</ThemedText>
-           <ThemedText style={styles.choreDescription}>
-             {activity.choreDescription}
-           </ThemedText>
-           <ThemedText style={styles.completedBy}>
-             Completed by {activity.userName}
-           </ThemedText>
-         </View>
-       </View>
-
-
-       <View style={styles.formSection}>
-         <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
-           Reason for Dispute
-         </ThemedText>
-         <TextInput
-           style={styles.textInput}
-           value={reason}
-           onChangeText={setReason}
-           placeholder="Explain why you're disputing this chore..."
-           placeholderTextColor="#999"
-           multiline
-           numberOfLines={4}
-           textAlignVertical="top"
-         />
-       </View>
-
-
-       <View style={styles.photoSection}>
-         <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
-           Photo Evidence (Optional)
-         </ThemedText>
-         <TouchableOpacity style={styles.photoButton} onPress={takePhoto}>
-           <Camera size={24} color="#666" />
-           <ThemedText style={styles.photoButtonText}>
-             {photo ? 'Retake Photo' : 'Take Photo'}
-           </ThemedText>
-         </TouchableOpacity>
-         {photo && (
-           <View style={styles.photoPreview}>
-             <Image source={{ uri: photo }} style={styles.photoImage} />
-             <TouchableOpacity
-               style={styles.removePhotoButton}
-               onPress={() => setPhoto(null)}
-             >
-               <X size={16} color="#fff" />
+     <KeyboardAvoidingView
+       style={styles.keyboardAvoidingView}
+       behavior={Platform.OS === "ios" ? "padding" : "height"}
+     >
+       <TouchableWithoutFeedback onPress={dismissKeyboard}>
+         <ThemedView style={styles.container}>
+           <View style={styles.header}>
+             <ThemedText type="title">Dispute Chore</ThemedText>
+             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+               <X size={24} color="#687076" />
              </TouchableOpacity>
            </View>
-         )}
-       </View>
 
 
-       <View style={styles.actions}>
-         <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-           <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
-         </TouchableOpacity>
-        
-         <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-           <Send size={16} color="#fff" />
-           <ThemedText style={styles.submitButtonText}>Submit Dispute</ThemedText>
-         </TouchableOpacity>
-       </View>
-     </ThemedView>
+           <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+             {/* chore info section - shows details about the chore being disputed */}
+             {/* example: user disputes "vacuum living room" chore that was marked complete by john */}
+             <View style={styles.choreInfo}>
+               <View style={styles.iconContainer}>
+                 <IconComponent size={32} color="#687076" />
+               </View>
+               <View style={styles.choreDetails}>
+                 <ThemedText type="defaultSemiBold">{activity.name}</ThemedText>
+                 <ThemedText style={styles.choreDescription}>
+                   {activity.description}
+                 </ThemedText>
+                 <ThemedText style={styles.completedBy}>
+                   Completed by {userName}
+                 </ThemedText>
+               </View>
+             </View>
+
+
+             {/* reason section - user explains why they're disputing the chore */}
+             <View style={styles.formSection}>
+               <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
+                 Reason for Dispute
+               </ThemedText>
+               <TextInput
+                 ref={textInputRef}
+                 style={styles.textInput}
+                 value={reason}
+                 onChangeText={setReason}
+                 placeholder="Explain why you're disputing this chore..."
+                 placeholderTextColor="#687076"
+                 multiline
+                 numberOfLines={4}
+                 textAlignVertical="top"
+               />
+             </View>
+
+
+             {/* photo evidence section - optional photo to support the dispute */}
+             <View style={styles.photoSection}>
+               <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
+                 Photo Evidene
+               </ThemedText>
+               <TouchableOpacity style={styles.photoButton} onPress={takePhoto}>
+                 <CameraIcon size={24} color="#687076" />
+                 <ThemedText style={styles.photoButtonText}>
+                   {photo ? 'Retake Photo' : 'Take Photo'}
+                 </ThemedText>
+               </TouchableOpacity>
+               {photo && (
+                 <View style={styles.photoPreview}>
+                   <Image source={{ uri: photo }} style={styles.photoImage} />
+                   <TouchableOpacity
+                     style={styles.removePhotoButton}
+                     onPress={() => setPhoto(null)}
+                   >
+                     <X size={16} color="#fff" />
+                   </TouchableOpacity>
+                 </View>
+               )}
+             </View>
+           </ScrollView>
+
+
+           {/* action buttons section - user can cancel or submit the dispute */}
+           <View style={styles.actions}>
+             <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+               <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
+             </TouchableOpacity>
+           
+             <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+               <Send size={16} color="#fff" />
+               <ThemedText style={styles.submitButtonText}>Submit Dispute</ThemedText>
+             </TouchableOpacity>
+           </View>
+         </ThemedView>
+       </TouchableWithoutFeedback>
+     </KeyboardAvoidingView>
    </Modal>
  );
 }
 
 
 const styles = StyleSheet.create({
+ keyboardAvoidingView: {
+   flex: 1,
+ },
  container: {
    flex: 1,
    padding: 20,
@@ -195,6 +397,9 @@ const styles = StyleSheet.create({
  },
  closeButton: {
    padding: 4,
+ },
+ scrollView: {
+   flex: 1,
  },
  choreInfo: {
    flexDirection: "row",
@@ -254,7 +459,7 @@ const styles = StyleSheet.create({
    gap: 8,
  },
  photoButtonText: {
-   color: "#666",
+   color: "#687076",
    fontWeight: "600",
  },
  photoPreview: {
@@ -265,7 +470,8 @@ const styles = StyleSheet.create({
  },
  photoImage: {
    width: "100%",
-   height: 150,
+   height: 200,
+   borderRadius: 8,
  },
  removePhotoButton: {
    position: "absolute",
@@ -278,12 +484,10 @@ const styles = StyleSheet.create({
    justifyContent: "center",
    alignItems: "center",
  },
-
-
  actions: {
    flexDirection: "row",
    gap: 12,
-   marginTop: "auto",
+   marginTop: 20,
  },
  cancelButton: {
    flex: 1,
@@ -293,7 +497,7 @@ const styles = StyleSheet.create({
    borderWidth: 1,
    borderColor: "#e0e0e0",
    alignItems: "center",
-   backgroundColor: "#9E9E9E",
+   backgroundColor: "#718096",
  },
  cancelButtonText: {
    color: "#fff",
@@ -304,7 +508,7 @@ const styles = StyleSheet.create({
    flexDirection: "row",
    alignItems: "center",
    justifyContent: "center",
-   backgroundColor: "#4CAF50",
+   backgroundColor: "#38A169",
    paddingVertical: 12,
    paddingHorizontal: 16,
    borderRadius: 8,
@@ -314,5 +518,73 @@ const styles = StyleSheet.create({
    color: "#fff",
    fontWeight: "600",
  },
+ cameraContainer: {
+   flex: 1,
+   alignItems: "center",
+   justifyContent: "center",
+   padding: 20,
+ },
+ cameraTitle: {
+   fontSize: 20,
+   fontWeight: "bold",
+   marginBottom: 20,
+   color: "#fff",
+ },
+ cameraViewContainer: {
+   width: "100%",
+   aspectRatio: 1,
+   backgroundColor: "black",
+   marginBottom: 20,
+   borderRadius: 10,
+   overflow: "hidden",
+ },
+ camera: {
+   flex: 1,
+ },
+ cameraButton: {
+   backgroundColor: "#38A169",
+   paddingVertical: 12,
+   paddingHorizontal: 24,
+   borderRadius: 8,
+ },
+ cameraButtonText: {
+   color: "#fff",
+   fontWeight: "600",
+   fontSize: 16,
+ },
+ backdrop: {
+   ...StyleSheet.absoluteFillObject,
+   backgroundColor: "#E53E3E",
+ },
+ alertContainer: {
+   ...StyleSheet.absoluteFillObject,
+   justifyContent: "center",
+   alignItems: "center",
+ },
+ disputeCreatedText: {
+   fontSize: 24,
+   fontWeight: "bold",
+   color: "#E53E3E",
+   marginTop: 10,
+   textAlign: "center",
+ },
+ successContainer: {
+   flex: 1,
+   backgroundColor: "#E53E3E",
+   justifyContent: "center",
+   alignItems: "center",
+   padding: 40,
+   paddingTop: 80, // extra top padding to prevent text cutoff lol
+ },
+ successTitle: {
+   color: "#fff",
+   fontSize: 28,
+   fontWeight: "bold",
+   textAlign: "center",
+   marginBottom: 40,
+   lineHeight: 36, // Add line height to make sure  text is fully visible
+ },
+
+
 });
 
