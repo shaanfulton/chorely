@@ -1,4 +1,5 @@
-import { RecentActivity } from "@/data/api";
+import { Chore } from "@/data/api";
+import { useGlobalChores } from "@/context/ChoreContext";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { AlertTriangle } from "lucide-react-native";
 import React from "react";
@@ -8,14 +9,20 @@ import { ThemedView } from "./ThemedView";
 
 
 interface RecentActivityItemProps {
- activity: RecentActivity;
- onDispute: (activity: RecentActivity) => void;
+ activity: Chore;
+ onDispute: (activity: Chore) => void;
 }
 
 
 export function RecentActivityItem({ activity, onDispute }: RecentActivityItemProps) {
- const IconComponent = getLucideIcon(activity.choreIcon);
+ const { currentUser } = useGlobalChores();
+ const IconComponent = getLucideIcon(activity.icon);
 
+ // Helper function to get user name from email
+ const getUserName = (email: string | null) => {
+   if (!email) return "Unknown User";
+   return email.split('@')[0];
+ };
 
  return (
    <ThemedView style={styles.container}>
@@ -24,18 +31,18 @@ export function RecentActivityItem({ activity, onDispute }: RecentActivityItemPr
          <IconComponent size={20} color="#666" />
        </View>
        <View style={styles.content}>
-         <ThemedText type="defaultSemiBold">{activity.choreName}</ThemedText>
+         <ThemedText type="defaultSemiBold">{activity.name}</ThemedText>
          <ThemedText style={styles.description}>
-           {activity.choreDescription}
+           {activity.description}
          </ThemedText>
          <ThemedText style={styles.userName}>
-           Completed by {activity.userName}
+           Completed by {activity.user_email === currentUser?.email ? "you" : getUserName(activity.user_email)}
          </ThemedText>
        </View>
      </View>
 
-
-     {activity.canDispute && (
+     {/* Only show dispute button for completed chores that the current user didn't complete */}
+     {activity.status === "complete" && activity.user_email !== currentUser?.email && (
        <TouchableOpacity
          style={styles.disputeButton}
          onPress={() => onDispute(activity)}

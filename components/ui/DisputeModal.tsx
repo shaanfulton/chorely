@@ -1,23 +1,29 @@
-import { RecentActivity, createDisputeAPI } from "@/data/api";
+import { Chore, createDisputeAPI } from "@/data/api";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { Camera, Send, X } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
  Alert,
- Image,
+ KeyboardAvoidingView,
  Modal,
+ Platform,
+ ScrollView,
  StyleSheet,
  TextInput,
  TouchableOpacity,
  View,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import * as Linking from "expo-linking";
+import { Image as ExpoImage } from "expo-image";
+
 import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
 
 
 interface DisputeModalProps {
  visible: boolean;
- activity: RecentActivity | null;
+ activity: Chore | null;
  onClose: () => void;
  onDisputeCreated: () => void;
 }
@@ -31,66 +37,125 @@ export function DisputeModal({
 }: DisputeModalProps) {
  const [reason, setReason] = useState("");
  const [photo, setPhoto] = useState<string | null>(null);
+ const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+ const [canAskCameraPermissionAgain, setCanAskCameraPermissionAgain] = useState<boolean>(true);
+ const [isTakingPhoto, setIsTakingPhoto] = useState(false);
 
+ // Reset form when modal opens/closes
+ useEffect(() => {
+   if (!visible) {
+     setReason("");
+     setPhoto(null);
+     setIsTakingPhoto(false);
+   }
+ }, [visible]);
 
- const takePhoto = () => {
-   // Simulate taking a photo - in a real app, this would use expo-image-picker
-   // For now, its jsst a placeholder image
-   Alert.alert(
-     "Photo Taken",
-     "Photo functionality would be implemented with expo-image-picker. For now, using a placeholder.",
-     [
-       {
-         text: "OK",
-         onPress: () => {
-           // Simulate a photo being taken
-           setPhoto("https://via.placeholder.com/300x200/cccccc/666666?text=Photo+Evidence");
-         },
-       },
-     ]
-   );
+ useEffect(() => {
+   // Load existing camera permission status
+   const loadPermissions = async () => {
+     const currentPerm = await ImagePicker.getCameraPermissionsAsync();
+     setHasCameraPermission(currentPerm.granted);
+     setCanAskCameraPermissionAgain(currentPerm.canAskAgain ?? true);
+   };
+   loadPermissions();
+ }, []);
+
+ const takePhoto = async () => {
+   if (isTakingPhoto) return;
+   setIsTakingPhoto(true);
+
+   try {
+     // Ensure camera permission
+     let granted = hasCameraPermission === true;
+     if (!granted) {
+       const req = await ImagePicker.requestCameraPermissionsAsync();
+       granted = req.granted;
+       setHasCameraPermission(req.granted);
+       setCanAskCameraPermissionAgain(req.canAskAgain ?? false);
+     }
+     
+     if (!granted) {
+       if (!canAskCameraPermissionAgain) {
+         Alert.alert(
+           "Camera Permission Required",
+           "Please enable camera access in Settings to take photos.",
+           [
+             { text: "Cancel", style: "cancel" },
+             { text: "Open Settings", onPress: () => Linking.openSettings() }
+           ]
+         );
+       }
+       setIsTakingPhoto(false);
+       return;
+     }
+
+     // Open the system camera UI
+     const result = await ImagePicker.launchCameraAsync({
+       mediaTypes: ImagePicker.MediaTypeOptions.Images,
+       quality: 0.7,
+       allowsEditing: false,
+       exif: false,
+       base64: false,
+     });
+
+     if (!result.canceled && result.assets?.[0]?.uri) {
+       setPhoto(result.assets[0].uri);
+     }
+   } catch (error) {
+     console.error("Error taking photo:", error);
+     Alert.alert("Error", "Failed to take photo. Please try again.");
+   } finally {
+     setIsTakingPhoto(false);
+   }
  };
 
 
- const handleSubmit = () => {
+ const handleSubmit = async () => {
    if (!reason.trim()) {
      Alert.alert("Error", "Please provide a reason for the dispute");
      return;
    }
-
 
    if (!activity) {
      Alert.alert("Error", "No activity selected");
      return;
    }
 
-
-   // Create dispute with photo if available
-   createDisputeAPI(activity.choreId, reason.trim(), photo);
-  
-   Alert.alert(
-     "Dispute Created",
-     "Your dispute has been submitted and is pending review.",
-     [
-       {
-         text: "OK",
-         onPress: () => {
-           setReason("");
-           setPhoto(null);
-           onClose();
-           onDisputeCreated();
+   try {
+     // Create dispute with photo if available
+     await createDisputeAPI(activity.uuid, reason.trim(), photo);
+     
+     Alert.alert(
+       "Dispute Created",
+       "Your dispute has been submitted and is pending review.",
+       [
+         {
+           text: "OK",
+           onPress: () => {
+             setReason("");
+             setPhoto(null);
+             onClose();
+             onDisputeCreated();
+           },
          },
-       },
-     ]
-   );
+       ]
+     );
+   } catch (error) {
+     Alert.alert("Error", "Failed to create dispute. Please try again.");
+   }
  };
 
 
  if (!activity) return null;
 
 
- const IconComponent = getLucideIcon(activity.choreIcon);
+ const IconComponent = getLucideIcon(activity.icon);
 
+ // Helper function to get user name from email
+ const getUserName = (email: string | null) => {
+   if (!email) return "Unknown User";
+   return email.split('@')[0];
+ };
 
  return (
    <Modal
@@ -99,92 +164,112 @@ export function DisputeModal({
      presentationStyle="pageSheet"
      onRequestClose={onClose}
    >
-     <ThemedView style={styles.container}>
-       <View style={styles.header}>
-         <ThemedText type="title">Dispute Chore</ThemedText>
-         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-           <X size={24} color="#666" />
-         </TouchableOpacity>
-       </View>
-
-
-       <View style={styles.choreInfo}>
-         <View style={styles.iconContainer}>
-           <IconComponent size={32} color="#666" />
+     <KeyboardAvoidingView 
+       style={styles.keyboardAvoidingView}
+       behavior={Platform.OS === "ios" ? "padding" : "height"}
+     >
+       <ThemedView style={styles.container}>
+         <View style={styles.header}>
+           <ThemedText type="title">Dispute Chore</ThemedText>
+           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+             <X size={24} color="#666" />
+           </TouchableOpacity>
          </View>
-         <View style={styles.choreDetails}>
-           <ThemedText type="defaultSemiBold">{activity.choreName}</ThemedText>
-           <ThemedText style={styles.choreDescription}>
-             {activity.choreDescription}
-           </ThemedText>
-           <ThemedText style={styles.completedBy}>
-             Completed by {activity.userName}
-           </ThemedText>
-         </View>
-       </View>
 
+         <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+           <View style={styles.choreInfo}>
+             <View style={styles.iconContainer}>
+               <IconComponent size={32} color="#666" />
+             </View>
+             <View style={styles.choreDetails}>
+               <ThemedText type="defaultSemiBold" style={styles.choreName}>
+                 {activity.name}
+               </ThemedText>
+               <ThemedText style={styles.choreDescription}>
+                 {activity.description}
+               </ThemedText>
+               <ThemedText style={styles.completedBy}>
+                 Completed by {getUserName(activity.user_email)}
+               </ThemedText>
+             </View>
+           </View>
 
-       <View style={styles.formSection}>
-         <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
-           Reason for Dispute
-         </ThemedText>
-         <TextInput
-           style={styles.textInput}
-           value={reason}
-           onChangeText={setReason}
-           placeholder="Explain why you're disputing this chore..."
-           placeholderTextColor="#999"
-           multiline
-           numberOfLines={4}
-           textAlignVertical="top"
-         />
-       </View>
+           <View style={styles.formSection}>
+             <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
+               Reason for Dispute
+             </ThemedText>
+             <TextInput
+               style={styles.textInput}
+               value={reason}
+               onChangeText={setReason}
+               placeholder="Explain why you're disputing this chore..."
+               placeholderTextColor="#999"
+               multiline
+               numberOfLines={6}
+               textAlignVertical="top"
+               returnKeyType="done"
+               blurOnSubmit={true}
+             />
+           </View>
 
+           <View style={styles.photoSection}>
+             <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
+               Photo Evidence (Optional)
+             </ThemedText>
+             
+             <View style={styles.cameraContainer}>
+               {photo ? (
+                 <ExpoImage source={{ uri: photo }} style={styles.camera} contentFit="cover" />
+               ) : (
+                 <View style={[styles.camera, styles.placeholder]}>
+                   <Camera color="#9CA3AF" size={36} />
+                   <ThemedText style={styles.placeholderText}>No photo yet</ThemedText>
+                 </View>
+               )}
+             </View>
 
-       <View style={styles.photoSection}>
-         <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
-           Photo Evidence (Optional)
-         </ThemedText>
-         <TouchableOpacity style={styles.photoButton} onPress={takePhoto}>
-           <Camera size={24} color="#666" />
-           <ThemedText style={styles.photoButtonText}>
-             {photo ? 'Retake Photo' : 'Take Photo'}
-           </ThemedText>
-         </TouchableOpacity>
-         {photo && (
-           <View style={styles.photoPreview}>
-             <Image source={{ uri: photo }} style={styles.photoImage} />
-             <TouchableOpacity
-               style={styles.removePhotoButton}
-               onPress={() => setPhoto(null)}
+             <TouchableOpacity 
+               style={styles.photoButton} 
+               onPress={takePhoto}
+               disabled={isTakingPhoto}
              >
-               <X size={16} color="#fff" />
+               <Camera size={24} color="#666" />
+               <ThemedText style={styles.photoButtonText}>
+                 {isTakingPhoto ? 'Taking Photo...' : (photo ? 'Retake Photo' : 'Take Photo')}
+               </ThemedText>
              </TouchableOpacity>
            </View>
-         )}
-       </View>
+         </ScrollView>
+
+         <View style={styles.actions}>
+           <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+             <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
+           </TouchableOpacity>
+          
+           <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+             <Send size={16} color="#fff" />
+             <ThemedText style={styles.submitButtonText}>Submit Dispute</ThemedText>
+                        </TouchableOpacity>
+           </View>
+         </ThemedView>
+       </KeyboardAvoidingView>
+     </Modal>
 
 
-       <View style={styles.actions}>
-         <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-           <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
-         </TouchableOpacity>
-        
-         <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-           <Send size={16} color="#fff" />
-           <ThemedText style={styles.submitButtonText}>Submit Dispute</ThemedText>
-         </TouchableOpacity>
-       </View>
-     </ThemedView>
-   </Modal>
- );
-}
+   );
+ }
 
 
 const styles = StyleSheet.create({
+ keyboardAvoidingView: {
+   flex: 1,
+ },
  container: {
    flex: 1,
    padding: 20,
+ },
+ scrollContent: {
+   flex: 1,
  },
  header: {
    flexDirection: "row",
@@ -215,6 +300,11 @@ const styles = StyleSheet.create({
  choreDetails: {
    flex: 1,
  },
+ choreName: {
+   fontSize: 16,
+   fontWeight: "600",
+   marginBottom: 4,
+ },
  choreDescription: {
    fontSize: 14,
    opacity: 0.7,
@@ -235,13 +325,33 @@ const styles = StyleSheet.create({
    borderWidth: 1,
    borderColor: "#e0e0e0",
    borderRadius: 8,
-   padding: 12,
+   padding: 16,
    fontSize: 16,
-   minHeight: 100,
+   minHeight: 120,
    backgroundColor: "#fff",
+   textAlignVertical: "top",
  },
  photoSection: {
    marginBottom: 24,
+ },
+   cameraContainer: {
+    width: "100%",
+    height: 350,
+    backgroundColor: "#F3F4F6",
+    marginBottom: 20,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+ camera: {
+   flex: 1,
+ },
+ placeholder: {
+   alignItems: "center",
+   justifyContent: "center",
+   gap: 8,
+ },
+ placeholderText: {
+   color: "#9CA3AF",
  },
  photoButton: {
    flexDirection: "row",
@@ -256,27 +366,6 @@ const styles = StyleSheet.create({
  photoButtonText: {
    color: "#666",
    fontWeight: "600",
- },
- photoPreview: {
-   position: "relative",
-   marginTop: 12,
-   borderRadius: 8,
-   overflow: "hidden",
- },
- photoImage: {
-   width: "100%",
-   height: 150,
- },
- removePhotoButton: {
-   position: "absolute",
-   top: 5,
-   right: 5,
-   backgroundColor: "rgba(0,0,0,0.5)",
-   borderRadius: 10,
-   width: 20,
-   height: 20,
-   justifyContent: "center",
-   alignItems: "center",
  },
 
 

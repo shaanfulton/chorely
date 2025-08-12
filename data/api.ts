@@ -49,19 +49,10 @@ export interface Dispute {
   imageUrl?: string;
   status: "pending" | "approved" | "rejected";
   createdAt: string;
+  claimedByEmail: string; // Email of the user who claimed the chore (required)
 }
 
-export interface RecentActivity {
-  uuid: string;
-  choreId: string;
-  choreName: string;
-  choreDescription: string;
-  choreIcon: string;
-  userEmail: string;
-  userName: string;
-  completedAt: string;
-  canDispute: boolean;
-}
+
 
 // Helpers
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
@@ -140,8 +131,15 @@ export async function createUserAPI(
     method: "POST",
     body: JSON.stringify({ email, name, homeIds: homeId ? [homeId] : [] }),
   });
-  const homes = await getUserHomesAPI(email);
-  return { email: row.email, name: row.name, homeIDs: homes.map((h) => h.id) };
+  
+  // Only fetch homes if a homeId was provided
+  if (homeId) {
+    const homes = await getUserHomesAPI(email);
+    return { email: row.email, name: row.name, homeIDs: homes.map((h) => h.id) };
+  } else {
+    // New user with no homes
+    return { email: row.email, name: row.name, homeIDs: [] };
+  }
 }
 
 // Homes
@@ -156,8 +154,16 @@ export async function getAllHomesAPI(): Promise<Home[]> {
 }
 
 export async function getUserHomesAPI(email: string): Promise<Home[]> {
-  const rows = await http<any[]>(`/user/${encodeURIComponent(email)}/home`);
-  return rows.map(mapHomeRow);
+  try {
+    const rows = await http<any[]>(`/user/${encodeURIComponent(email)}/home`);
+    return rows.map(mapHomeRow);
+  } catch (error) {
+    // If user has no homes, return empty array instead of throwing
+    if (error instanceof Error && error.message.includes("has no homes")) {
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function getHomeUsersAPI(homeId: string): Promise<User[]> {
@@ -256,11 +262,19 @@ export async function completeChoreAPI(uuid: string): Promise<void> {
 
 // Approval voting
 export async function voteForChoreAPI(uuid: string, userEmail: string): Promise<boolean> {
-  const res = await http<any>(`/approvals/${encodeURIComponent(uuid)}/vote`, {
-    method: "POST",
-    body: JSON.stringify({ userEmail }),
-  });
-  return !!res?.approved;
+  try {
+    const res = await http<any>(`/approvals/${encodeURIComponent(uuid)}/vote`, {
+      method: "POST",
+      body: JSON.stringify({ userEmail }),
+    });
+    return !!res?.approved;
+  } catch (error: any) {
+    if (error.message.includes("User has already voted on this chore")) {
+      // Return false to indicate the vote was not successful
+      return false;
+    }
+    throw error;
+  }
 }
 
 export async function removeVoteForChoreAPI(uuid: string, userEmail: string): Promise<boolean> {
@@ -276,18 +290,26 @@ export async function getChoreApprovalStatusAPI(uuid: string): Promise<{
   votesNeeded: number;
   currentVotes: number;
   isApproved: boolean;
+  totalEligibleVoters: number;
+  voters?: string[];
 } | null> {
-  const chore = await getChoreByIdAPI(uuid);
-  if (!chore) return null;
   const status = await http<any>(`/approvals/${encodeURIComponent(uuid)}`);
-  const users = await getHomeUsersAPI(chore.homeID);
-  const hasVoted: { [email: string]: boolean } = {};
-  users.forEach((u) => (hasVoted[u.email] = status.voters?.includes(u.email)));
+  
+  // Create hasVoted object from voters array
+  const hasVoted: { [userEmail: string]: boolean } = {};
+  if (status.voters && Array.isArray(status.voters)) {
+    status.voters.forEach((voter: string) => {
+      hasVoted[voter] = true;
+    });
+  }
+  
   return {
     hasVoted,
     votesNeeded: status.required,
     currentVotes: status.votes,
-    isApproved: chore.status !== "unapproved",
+    isApproved: status.status !== "unapproved",
+    totalEligibleVoters: status.total_users ?? 0,
+    voters: status.voters ?? [],
   };
 }
 
@@ -352,18 +374,22 @@ export async function getActiveDisputesAPI(): Promise<Dispute[]> {
   const enriched = await Promise.all(
     rows.map(async (d) => {
       const chore = await getChoreByIdAPI(d.chore_id);
+      if (!chore?.user_email) {
+        throw new Error(`Chore ${d.chore_id} has no assigned user, cannot create dispute`);
+      }
       return {
         uuid: d.uuid,
         choreId: d.chore_id,
-        choreName: chore?.name || "Chore",
-        choreDescription: chore?.description || "",
-        choreIcon: chore?.icon || "package",
+        choreName: chore.name || "Chore",
+        choreDescription: chore.description || "",
+        choreIcon: chore.icon || "package",
         disputerEmail: d.disputer_email,
         disputerName: inferUserNameFromEmail(d.disputer_email),
         reason: d.reason,
         imageUrl: d.image_url || undefined,
         status: d.status,
         createdAt: d.created_at || new Date().toISOString(),
+        claimedByEmail: chore.user_email,
       } as Dispute;
     })
   );
@@ -378,21 +404,67 @@ export async function rejectDisputeAPI(uuid: string): Promise<void> {
   await http(`/disputes/${encodeURIComponent(uuid)}/reject`, { method: "PATCH" });
 }
 
-export async function getRecentActivitiesAPI(params?: { homeId?: string; timeFrame?: "1d" | "7d" | "30d" }): Promise<RecentActivity[]> {
+// Dispute voting types and interfaces
+export type VoteType = "approve" | "reject";
+
+export interface DisputeVoteStatus {
+  dispute_uuid: string;
+  approve_votes: number;
+  reject_votes: number;
+  total_votes: number;
+  required_votes: number;
+  total_eligible_voters: number;
+  is_approved: boolean;
+  is_rejected: boolean;
+  is_24_hours_passed: boolean;
+  hours_since_creation: number;
+  voters: {
+    user_email: string;
+    vote: VoteType;
+  }[];
+}
+
+// Dispute voting API functions
+export async function voteOnDisputeAPI(disputeUuid: string, userEmail: string, vote: VoteType): Promise<void> {
+  await http(`/dispute-votes/${encodeURIComponent(disputeUuid)}/vote`, {
+    method: "POST",
+    body: JSON.stringify({ userEmail, vote })
+  });
+}
+
+export async function removeDisputeVoteAPI(disputeUuid: string, userEmail: string): Promise<void> {
+  await http(`/dispute-votes/${encodeURIComponent(disputeUuid)}/vote`, {
+    method: "DELETE",
+    body: JSON.stringify({ userEmail })
+  });
+}
+
+export async function getDisputeVoteStatusAPI(disputeUuid: string): Promise<DisputeVoteStatus> {
+  return await http<DisputeVoteStatus>(`/dispute-votes/${encodeURIComponent(disputeUuid)}/status`);
+}
+
+export async function getUserDisputeVoteAPI(disputeUuid: string, userEmail: string): Promise<VoteType | null> {
+  const result = await http<{ vote: VoteType | null }>(`/dispute-votes/${encodeURIComponent(disputeUuid)}/user/${encodeURIComponent(userEmail)}`);
+  return result.vote;
+}
+
+export async function getRecentActivitiesAPI(params?: { homeId?: string; timeFrame?: "1d" | "3d" | "7d" | "30d" }): Promise<Chore[]> {
   const q = new URLSearchParams();
   if (params?.homeId) q.set("homeId", params.homeId);
   if (params?.timeFrame) q.set("timeFrame", params.timeFrame);
   const rows = await http<any[]>(`/activities${q.toString() ? `?${q.toString()}` : ""}`);
   return rows.map((r) => ({
     uuid: r.uuid,
-    choreId: r.uuid,
-    choreName: r.name,
-    choreDescription: r.description,
-    choreIcon: r.icon,
-    userEmail: r.user_email,
-    userName: inferUserNameFromEmail(r.user_email),
-    completedAt: r.completed_at || r.updated_at || new Date().toISOString(),
-    canDispute: true,
+    name: r.name,
+    description: r.description,
+    icon: r.icon,
+    points: r.points,
+    time: r.time,
+    status: r.status,
+    user_email: r.user_email,
+    homeID: r.home_id,
+    todos: r.todos || [],
+    approvalList: [],
   }));
 }
 
@@ -412,18 +484,22 @@ export async function createDisputeAPI(
     }),
   });
   const chore = await getChoreByIdAPI(choreId);
+  if (!chore?.user_email) {
+    throw new Error(`Chore ${choreId} has no assigned user, cannot create dispute`);
+  }
   return {
     uuid: row.uuid,
     choreId,
-    choreName: chore?.name || "Chore",
-    choreDescription: chore?.description || "",
-    choreIcon: chore?.icon || "package",
+    choreName: chore.name || "Chore",
+    choreDescription: chore.description || "",
+    choreIcon: chore.icon || "package",
     disputerEmail: row.disputer_email,
     disputerName: inferUserNameFromEmail(row.disputer_email),
     reason: row.reason,
     imageUrl: row.image_url || undefined,
     status: row.status,
     createdAt: row.created_at || new Date().toISOString(),
+    claimedByEmail: chore.user_email,
   };
 }
 

@@ -1,6 +1,6 @@
 import { Colors } from "@/constants/Colors";
 import { useGlobalChores } from "@/context/ChoreContext";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { ApprovalListItem } from "./ApprovalListItem";
 import { Button } from "./Button";
@@ -16,6 +16,33 @@ export function ChoreApprovalList() {
     currentUser,
   } = useGlobalChores();
   const [votingChoreId, setVotingChoreId] = useState<string | null>(null);
+  const [approvalStatuses, setApprovalStatuses] = useState<{[key: string]: any}>({});
+
+  // Load approval status from backend for minimal but accurate data
+  const loadStatuses = async () => {
+    const entries = await Promise.all(
+      pendingApprovalChores.map(async (chore) => {
+        try {
+          const status = await getChoreApprovalStatus(chore.uuid);
+          return [chore.uuid, status] as const;
+        } catch (e) {
+          return [chore.uuid, null] as const;
+        }
+      })
+    );
+    const next: {[k: string]: any} = {};
+    entries.forEach(([id, st]) => { next[id] = st; });
+    setApprovalStatuses(next);
+  };
+
+  // Update approval statuses whenever pendingApprovalChores changes
+  useEffect(() => {
+    if (pendingApprovalChores.length > 0) {
+      loadStatuses();
+    } else {
+      setApprovalStatuses({});
+    }
+  }, [pendingApprovalChores]);
 
   if (isLoading) {
     return (
@@ -34,15 +61,27 @@ export function ChoreApprovalList() {
 
     try {
       setVotingChoreId(choreId);
-      const approvalStatus = getChoreApprovalStatus(choreId);
+      const approvalStatus = approvalStatuses[choreId];
+      const userHasVoted = approvalStatus?.hasVoted?.[currentUser.email] === true;
 
-      if (approvalStatus?.hasVoted[currentUser.email]) {
+      console.log("handleVoteToggle:", {
+        choreId,
+        approvalStatus,
+        currentUserEmail: currentUser.email,
+        userHasVoted,
+      });
+
+      if (userHasVoted) {
         // User has already voted, remove their vote
         await removeVoteForChore(choreId);
       } else {
         // User hasn't voted yet, add their vote
         await voteForChore(choreId);
       }
+
+      // After action, refresh status for this chore only
+      const refreshed = await getChoreApprovalStatus(choreId);
+      setApprovalStatuses((prev) => ({ ...prev, [choreId]: refreshed }));
     } catch (error) {
       console.error("Failed to toggle vote:", error);
     } finally {
@@ -54,13 +93,19 @@ export function ChoreApprovalList() {
     <View style={styles.container}>
       <ThemedText type="subtitle">Vote on New Chores</ThemedText>
       {pendingApprovalChores.map((chore) => {
-        const approvalStatus = getChoreApprovalStatus(chore.uuid);
-        const hasUserVoted = currentUser
-          ? approvalStatus?.hasVoted[currentUser.email] || false
-          : false;
+        const approvalStatus = approvalStatuses[chore.uuid];
+        const hasUserVoted = approvalStatus?.hasVoted?.[currentUser?.email || ""] === true;
         const votesText = approvalStatus
-          ? `${approvalStatus.currentVotes}/${approvalStatus.votesNeeded} votes`
+          ? `${approvalStatus.currentVotes}/${approvalStatus.totalEligibleVoters} votes`
           : "";
+
+        console.log("ChoreApprovalList render:", {
+          choreUuid: chore.uuid,
+          approvalStatus,
+          currentUserEmail: currentUser?.email,
+          hasUserVoted,
+          hasVoted: approvalStatus?.hasVoted,
+        });
 
         return (
           <ApprovalListItem key={chore.uuid} chore={chore}>

@@ -11,16 +11,24 @@ import {
   Chore,
   TodoItem,
   getChoreByIdAPI,
-  getCurrentUserEmail,
 } from "@/data/api";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { getTimeRemaining } from "@/utils/timeUtils";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Clock } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, Text } from "react-native";
 
-function ChoreViewContent({ chore }: { chore: Chore }) {
+function ChoreViewContent({ chore }: { chore: Chore | null }) {
+  // Early return if chore is not available
+  if (!chore) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>Chore not found or loading...</Text>
+      </View>
+    );
+  }
+
   const [selectedItem, setSelectedItem] = useState<TodoItem | null>(null);
   const { isAllCompleted, resetCompleted } = useChecklist();
   const {
@@ -29,9 +37,20 @@ function ChoreViewContent({ chore }: { chore: Chore }) {
     removeVoteForChore,
     getChoreApprovalStatus,
     currentUser,
+    pendingApprovalChores,
   } = useGlobalChores();
+
+  console.log("ChoreViewContent render:", {
+    choreUuid: chore.uuid,
+    choreStatus: chore.status,
+    pendingApprovalChoresCount: pendingApprovalChores.length,
+    pendingApprovalChores: pendingApprovalChores.map(c => ({
+      uuid: c.uuid,
+      approvalList: c.approvalList
+    }))
+  });
   const router = useRouter();
-  const currentUserEmail = getCurrentUserEmail();
+  const currentUserEmail = currentUser?.email;
   const [isClaimingChore, setIsClaimingChore] = useState(false);
   const [isVotingChore, setIsVotingChore] = useState(false);
   const [isNavigatingToValidation, setIsNavigatingToValidation] =
@@ -57,14 +76,19 @@ function ChoreViewContent({ chore }: { chore: Chore }) {
   };
 
   const handleVerifyChore = async () => {
+    if (isNavigatingToValidation) return; // guard against double taps
     if (chore && chore.status === "claimed") {
       try {
         setIsNavigatingToValidation(true);
         // Navigate to validation screen
         router.push(`/chore-validate?uuid=${chore.uuid}`);
+      } catch (error) {
+        console.error("Navigation error:", error);
       } finally {
         setIsNavigatingToValidation(false);
       }
+    } else {
+      // no-op if not claimable
     }
   };
 
@@ -73,18 +97,32 @@ function ChoreViewContent({ chore }: { chore: Chore }) {
 
     try {
       setIsVotingChore(true);
-      const approvalStatus = getChoreApprovalStatus(chore.uuid);
+      
+      // Calculate current vote status from local state
+      const choreInPending = pendingApprovalChores.find(c => c.uuid === chore.uuid);
+      const hasVoted = choreInPending?.approvalList?.includes(currentUser.email) || false;
 
-      if (approvalStatus?.hasVoted[currentUser.email]) {
+      console.log("handleVoteToggle called:", {
+        choreUuid: chore.uuid,
+        choreInPending: !!choreInPending,
+        approvalList: choreInPending?.approvalList,
+        currentUserEmail: currentUser.email,
+        hasVoted
+      });
+
+      if (hasVoted) {
         // User has already voted, remove their vote
+        console.log("Removing vote for chore:", chore.uuid);
         await removeVoteForChore(chore.uuid);
       } else {
         // User hasn't voted yet, add their vote
+        console.log("Adding vote for chore:", chore.uuid);
         const success = await voteForChore(chore.uuid);
         // If the chore got approved (status changed), navigate back to home
         if (success) {
-          const updatedStatus = getChoreApprovalStatus(chore.uuid);
-          if (updatedStatus?.isApproved) {
+          // Check if chore was moved to available (approved)
+          const choreStillPending = pendingApprovalChores.find(c => c.uuid === chore.uuid);
+          if (!choreStillPending) {
             router.push("/");
           }
         }
@@ -100,26 +138,24 @@ function ChoreViewContent({ chore }: { chore: Chore }) {
   const getButtonContent = () => {
     // If chore is unapproved - show voting button
     if (chore.status === "unapproved") {
-      const approvalStatus = getChoreApprovalStatus(chore.uuid);
-      const hasUserVoted = currentUser
-        ? approvalStatus?.hasVoted[currentUser.email] || false
-        : false;
-      const votesText = approvalStatus
-        ? `${approvalStatus.currentVotes}/${approvalStatus.votesNeeded} votes needed`
-        : "";
-
+      // Check if user has voted from local state
+      const choreInPending = pendingApprovalChores.find(c => c.uuid === chore.uuid);
+      const hasVoted = choreInPending?.approvalList?.includes(currentUser?.email || "") || false;
+      
+      console.log("Button state for chore:", chore.uuid, {
+        choreInPending: !!choreInPending,
+        approvalList: choreInPending?.approvalList,
+        currentUserEmail: currentUser?.email,
+        hasVoted,
+        buttonTitle: hasVoted ? "Remove Vote" : "Vote to Approve",
+        buttonColor: hasVoted ? "orange" : "green"
+      });
+      
       return (
         <View style={{ alignItems: "center" }}>
-          <ThemedText
-            style={{ fontSize: 14, marginBottom: 8, textAlign: "center" }}
-          >
-            {votesText}
-          </ThemedText>
           <Button
-            title={hasUserVoted ? "Remove Vote" : "Vote to Approve"}
-            backgroundColor={
-              hasUserVoted ? Colors.metro.orange : Colors.metro.green
-            }
+            title={hasVoted ? "Remove Vote" : "Vote to Approve"}
+            backgroundColor={hasVoted ? Colors.metro.orange : Colors.metro.green}
             loadingBackgroundColor={Colors.metro.teal}
             isLoading={isVotingChore}
             onPress={handleVoteToggle}
@@ -231,10 +267,19 @@ export default function ChoreView() {
   const [chore, setChore] = useState<Chore | null>(null);
 
   useEffect(() => {
-    if (uuid) {
-      const foundChore = getChoreByIdAPI(uuid as string);
-      setChore(foundChore ?? null);
-    }
+    const fetchChore = async () => {
+      if (uuid) {
+        try {
+          const foundChore = await getChoreByIdAPI(uuid as string);
+          setChore(foundChore ?? null);
+        } catch (error) {
+          console.error("Failed to fetch chore:", error);
+          setChore(null);
+        }
+      }
+    };
+    
+    fetchChore();
   }, [uuid]);
 
   if (!chore) {
@@ -319,5 +364,11 @@ const styles = StyleSheet.create({
     color: "#856404",
     fontWeight: "600",
     textAlign: "center",
+  },
+  errorText: {
+    color: "#D32F2F",
+    fontWeight: "600",
+    textAlign: "center",
+    fontSize: 16,
   },
 });

@@ -27,16 +27,23 @@ export function MyChoreList() {
   }
 
   const handleVerifyChore = async (chore: any) => {
-    if (chore && chore.status === "claimed") {
-      try {
-        setNavigatingChoreId(chore.uuid);
-        // Navigate to validation screen
-        router.push(`/chore-validate?uuid=${chore.uuid}`);
-      } finally {
-        setNavigatingChoreId(null);
-      }
+    if (navigatingChoreId) return; // guard against double taps
+    if (!chore || chore.status !== "claimed") return; // only allow claimed
+    try {
+      console.log("Verify from MyChoreList:", {
+        uuid: chore?.uuid,
+        status: chore?.status,
+      });
+      setNavigatingChoreId(chore.uuid);
+      router.push(`/chore-validate?uuid=${chore.uuid}`);
+    } finally {
+      setNavigatingChoreId(null);
     }
   };
+
+  if (myChores.length === 0) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>

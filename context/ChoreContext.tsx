@@ -411,7 +411,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
       if (!choreToVote) return false;
 
       try {
-        const success = voteForChoreAPI(choreUuid, currentUser.email);
+        const success = await voteForChoreAPI(choreUuid, currentUser.email);
         if (success) {
           // Refresh data to get updated state
           await fetchAllData();
@@ -433,7 +433,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
       if (!currentUser) return false;
 
       try {
-        const success = removeVoteForChoreAPI(choreUuid, currentUser.email);
+        const success = await removeVoteForChoreAPI(choreUuid, currentUser.email);
         if (success) {
           // Refresh data to get updated state
           await fetchAllData();
@@ -450,8 +450,8 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
   );
 
   // Get chore approval status
-  const getChoreApprovalStatus = useCallback((choreUuid: string) => {
-    return getChoreApprovalStatusAPI(choreUuid);
+  const getChoreApprovalStatus = useCallback(async (choreUuid: string) => {
+    return await getChoreApprovalStatusAPI(choreUuid);
   }, []);
 
   // Create chore with optimistic updates
@@ -489,7 +489,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
 
       try {
         // Make API call and get the real chore with proper UUID
-        const newChore = createChoreAPI(choreData, currentHome.id);
+        const newChore = await createChoreAPI(choreData, currentHome.id);
 
         // Replace the temporary chore with the real one
         const finalPending = updatedPending.map((chore) =>
@@ -519,16 +519,16 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
 
       try {
         setError(null);
-        const newHome = createHomeAPI(name, weeklyPointQuota);
+        const newHome = await createHomeAPI(name, weeklyPointQuota);
 
         // Join the newly created home
-        const joinSuccess = joinHomeAPI(currentUser.email, newHome.id);
+        const joinSuccess = await joinHomeAPI(currentUser.email, newHome.id);
         if (!joinSuccess) {
           throw new Error("Failed to join the newly created home");
         }
 
         // Update user homes
-        const updatedHomes = getUserHomesAPI(currentUser.email);
+        const updatedHomes = await getUserHomesAPI(currentUser.email);
         setUserHomes(updatedHomes);
 
         // Set the new home as current
@@ -562,11 +562,11 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
         }
 
         // Update user homes
-        const updatedHomes = getUserHomesAPI(currentUser.email);
+        const updatedHomes = await getUserHomesAPI(currentUser.email);
         setUserHomes(updatedHomes);
 
         // Set the joined home as current
-        const joinedHome = getHomeByIdAPI(homeId);
+        const joinedHome = await getHomeByIdAPI(homeId);
         if (joinedHome) {
           setCurrentHome(joinedHome);
         }
@@ -600,11 +600,11 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
   const refreshPoints = useCallback(async () => {
     if (!currentUser || !currentHome) return;
     try {
-      const currentUserPoints = getUserPointsAPI(
+      const currentUserPoints = await getUserPointsAPI(
         currentUser.email,
         currentHome.id
       );
-      const allPoints = getAllUserPointsAPI(currentHome.id);
+      const allPoints = await getAllUserPointsAPI(currentHome.id);
       setUserPoints(currentUserPoints);
       setAllUserPoints(allPoints);
     } catch (err) {
@@ -655,7 +655,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
 
       try {
         setError(null);
-        const success = leaveHomeAPI(currentUser.email, homeId);
+        const success = await leaveHomeAPI(currentUser.email, homeId);
 
         if (!success) {
           setError("Failed to leave home. Home may not exist.");
@@ -663,13 +663,14 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
         }
 
         // Update user homes by removing the left home
-        const updatedHomes = getUserHomesAPI(currentUser.email);
+        const updatedHomes = await getUserHomesAPI(currentUser.email);
         setUserHomes(updatedHomes);
 
         // If the user left their current home, switch to the first available home
         if (currentHome?.id === homeId) {
-          if (updatedHomes.length > 0) {
-            setCurrentHome(updatedHomes[0]);
+          const resolvedHomes = updatedHomes;
+          if (resolvedHomes.length > 0) {
+            setCurrentHome(resolvedHomes[0]);
           } else {
             setCurrentHome(null);
             // Clear all data if no homes left

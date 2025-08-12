@@ -22,15 +22,15 @@ export function ChoreListItem({
   const timeRemaining = getTimeRemaining(chore.time);
 
   return (
-    <Link
-      href={{
-        pathname: "/chore-view",
-        params: { uuid: chore.uuid },
-      }}
-      asChild
-    >
-      <Pressable>
-        <ThemedView style={styles.container}>
+    <ThemedView style={styles.container}>
+      <Link
+        href={{
+          pathname: "/chore-view",
+          params: { uuid: chore.uuid },
+        }}
+        asChild
+      >
+        <Pressable style={styles.leftContent}>
           <View style={styles.iconContainer}>
             <IconComponent size={24} color="#666" />
           </View>
@@ -53,12 +53,12 @@ export function ChoreListItem({
               </View>
             )}
           </View>
-          <View>
-            <ChoreProvider chore={chore}>{children}</ChoreProvider>
-          </View>
-        </ThemedView>
-      </Pressable>
-    </Link>
+        </Pressable>
+      </Link>
+      <View style={styles.rightContent} pointerEvents="box-none">
+        <ChoreProvider chore={chore}>{children}</ChoreProvider>
+      </View>
+    </ThemedView>
   );
 }
 
@@ -68,6 +68,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 10,
     marginVertical: 5,
+  },
+  leftContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  rightContent: {
+    marginLeft: 12,
   },
   iconContainer: {
     width: 50,

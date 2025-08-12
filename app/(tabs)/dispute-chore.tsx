@@ -9,25 +9,37 @@ import { DisputeModal } from "@/components/ui/DisputeModal";
 import { RecentActivityItem } from "@/components/ui/RecentActivityItems";
 import { 
   getActiveDisputesAPI, 
-  approveDisputeAPI, 
-  rejectDisputeAPI,
   getRecentActivitiesAPI,
   createDisputeAPI,
   type Dispute,
-  type RecentActivity
+  type Chore
 } from "@/data/api";
+import { useGlobalChores } from "@/context/ChoreContext";
 
 export default function DisputeChoreScreen() {
   const insets = useSafeAreaInsets();
+  const { currentHome } = useGlobalChores();
   const [disputes, setDisputes] = useState<Dispute[]>([]);
-  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
-  const [selectedActivity, setSelectedActivity] = useState<RecentActivity | null>(null);
+  const [recentActivities, setRecentActivities] = useState<Chore[]>([]);
+  const [selectedActivity, setSelectedActivity] = useState<Chore | null>(null);
   const [disputeModalVisible, setDisputeModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadData = () => {
-    setDisputes(getActiveDisputesAPI());
-    setRecentActivities(getRecentActivitiesAPI());
+  const loadData = async () => {
+    const disputesData = await getActiveDisputesAPI();
+    const activitiesData = await getRecentActivitiesAPI({ 
+      homeId: currentHome?.id,
+      timeFrame: "3d" 
+    });
+    
+    // Filter out activities that have active disputes
+    const disputedChoreIds = disputesData.map(dispute => dispute.choreId);
+    const filteredActivities = activitiesData.filter(activity => 
+      !disputedChoreIds.includes(activity.uuid)
+    );
+    
+    setDisputes(disputesData);
+    setRecentActivities(filteredActivities);
   };
 
   useEffect(() => {
@@ -40,45 +52,12 @@ export default function DisputeChoreScreen() {
     setRefreshing(false);
   };
 
-  const handleApproveDispute = (uuid: string) => {
-    Alert.alert(
-      "Approve Dispute",
-      "Are you sure you want to approve this dispute?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Approve",
-          style: "destructive",
-          onPress: () => {
-            approveDisputeAPI(uuid);
-            loadData();
-            Alert.alert("Success", "Dispute approved successfully");
-          },
-        },
-      ]
-    );
+  const handleDisputeResolved = () => {
+    // Reload data when a dispute is resolved
+    loadData();
   };
 
-  const handleRejectDispute = (uuid: string) => {
-    Alert.alert(
-      "Reject Dispute",
-      "Are you sure you want to reject this dispute?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Reject",
-          style: "destructive",
-          onPress: () => {
-            rejectDisputeAPI(uuid);
-            loadData();
-            Alert.alert("Success", "Dispute rejected successfully");
-          },
-        },
-      ]
-    );
-  };
-
-  const handleDisputeActivity = (activity: RecentActivity) => {
+  const handleDisputeActivity = (activity: Chore) => {
     setSelectedActivity(activity);
     setDisputeModalVisible(true);
   };
@@ -112,8 +91,7 @@ export default function DisputeChoreScreen() {
               <DisputeCard
                 key={dispute.uuid}
                 dispute={dispute}
-                onApprove={handleApproveDispute}
-                onReject={handleRejectDispute}
+                onDisputeResolved={handleDisputeResolved}
               />
             ))}
           </>
