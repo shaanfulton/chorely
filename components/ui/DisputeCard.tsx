@@ -194,17 +194,38 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
         setVoteFeedbackMessage(`Dispute ${isApproved ? 'approved' : 'rejected'}!`);
         setShowVoteFeedback(true);
         
-        // Slide animation after a short delay
+          // Slide animation after a short delay
         setTimeout(() => {
           setIsResolved(true);
-          Animated.timing(slideAnim, {
-            toValue: isApproved ? -1 : 2, // -1 for left slide (approved), 2 for down slide (rejected)
-            duration: 600, // Longer duration for smoother animation
-            useNativeDriver: true,
-            easing: Easing.linear, // Linear easing for smooth movement
-          }).start(() => {
-            onDisputeResolved(dispute.uuid, isApproved ? "approved" : "rejected"); // Pass resolution type
-          });
+            if (isApproved) {
+              // Left slide with a subtle bounce
+              Animated.spring(slideAnim, {
+                toValue: -1,
+                useNativeDriver: true,
+                bounciness: 12,
+                speed: 9,
+              }).start(() => {
+                onDisputeResolved(dispute.uuid, "approved");
+              });
+            } else {
+              // Downward transfer: ease out and fade near the end so it doesn't look stuck at the boundary
+              Animated.parallel([
+                Animated.timing(slideAnim, {
+                  toValue: 2,
+                  duration: 600,
+                  useNativeDriver: true,
+                  easing: Easing.out(Easing.cubic),
+                }),
+                Animated.timing(fadeAnim, {
+                  toValue: 0,
+                  duration: 250,
+                  delay: 400, // fade during the last ~40% of the travel
+                  useNativeDriver: true,
+                }),
+              ]).start(() => {
+                onDisputeResolved(dispute.uuid, "rejected");
+              });
+            }
         }, 1500); // Show feedback for 1.5 seconds before sliding
         return; // Don't hide feedback immediately
       }

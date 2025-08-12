@@ -29,6 +29,7 @@ export default function DisputeChoreScreen() {
   const [userVotedDisputes, setUserVotedDisputes] = useState<Set<string>>(new Set());
   const [disputeTargetPositions, setDisputeTargetPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
   const [activityAnimations, setActivityAnimations] = useState<Map<string, Animated.Value>>(new Map());
+  const [pendingBounceActivityId, setPendingBounceActivityId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!currentHome?.id || loading) return;
@@ -153,100 +154,37 @@ export default function DisputeChoreScreen() {
       newSet.delete(resolvedDisputeId);
       return newSet;
     });
-    
-    // If dispute was rejected, coordinate the animation with activity items
     if (resolutionType === "rejected" && resolvedDispute) {
-      // Create a chore object from the dispute for recent activities
-      const rejectedChore: Chore = {
-        uuid: resolvedDispute.choreId,
-        name: resolvedDispute.choreName,
-        description: resolvedDispute.choreDescription,
-        time: new Date().toISOString(), // Use current time as completion time
-        icon: resolvedDispute.choreIcon,
-        user_email: resolvedDispute.claimedByEmail,
-        status: "complete",
-        todos: [],
-        homeID: currentHome?.id || "",
-        points: 0, // Will be updated when data is reloaded
-        approvalList: [],
-        completed_at: new Date().toISOString(),
-        claimed_at: null,
-      };
-      
-      // Find the correct position to insert (after chores with later completion times)
-      let insertIndex = 0;
-      for (let i = 0; i < recentActivities.length; i++) {
-        const activityTime = new Date(recentActivities[i].completed_at || 0);
-        const rejectedTime = new Date(rejectedChore.completed_at || 0);
-        if (activityTime < rejectedTime) {
-          insertIndex = i;
-          break;
-        }
-        insertIndex = i + 1;
-      }
-      
-      // Calculate how much the dispute card should slide down
-      // It should match the cumulative movement of the activity items
-      const slideDistance = 20; // Distance for activity items to slide down
-      const itemsToMove = recentActivities.length - insertIndex;
-      const totalSlideDistance = itemsToMove * slideDistance;
-      
-      // Animate activity items that come after the insertion point
-      const newActivityAnimations = new Map(activityAnimations);
-      const activityItemHeight = 80; // Approximate height of activity item
-      
-      recentActivities.forEach((activity, index) => {
-        if (index >= insertIndex) {
-          // Create animation for items that need to slide down
-          const animValue = newActivityAnimations.get(activity.uuid) || new Animated.Value(0);
-          newActivityAnimations.set(activity.uuid, animValue);
-          
-          // Animate them down to make space
-          Animated.timing(animValue, {
-            toValue: slideDistance,
-            duration: 600,
-            useNativeDriver: true,
-            easing: Easing.linear,
-          }).start();
-        }
-      });
-      
-      setActivityAnimations(newActivityAnimations);
-      
-      // Calculate the target position for this specific dispute
-      const disputeCardHeight = 120;
-      const sectionTitleHeight = 50;
-      const padding = 20;
-      
-      // When this dispute is resolved, there will be one fewer dispute in the list
-      const remainingDisputes = disputes.length - 1;
-      const disputesSectionHeight = (remainingDisputes * disputeCardHeight) + sectionTitleHeight + padding;
-      const baseTargetY = disputesSectionHeight + (insertIndex * activityItemHeight) + sectionTitleHeight;
-      const targetY = baseTargetY + totalSlideDistance;
-      
-      // Update the target position for this specific dispute
-      setDisputeTargetPositions(prev => {
-        const newPositions = new Map(prev);
-        newPositions.set(resolvedDisputeId, { x: 0, y: targetY });
-        return newPositions;
-      });
-      
-      // Insert the rejected chore in chronological order
-      setRecentActivities(prev => {
-        const newActivities = [...prev];
-        newActivities.splice(insertIndex, 0, rejectedChore);
-        return newActivities;
-      });
-      
-      // Delay the data reload to allow the animation to complete
-      setTimeout(() => {
-        loadData();
-      }, 2000); // Wait 2 seconds for animation to complete
-    } else {
-      // For approved disputes, reload immediately
-      loadData();
+      setPendingBounceActivityId(resolvedDispute.choreId);
     }
+    
+    // Let the DisputeCard animate as an overlay. After its animation completes,
+    // refresh from backend to swap to the authoritative list and avoid overlaps/gaps.
+    setTimeout(() => {
+      loadData();
+    }, 700); // match card slide duration + small buffer
   }, [loadData, expandedDisputeId, disputes, currentHome?.id]);
+
+  useEffect(() => {
+    if (!pendingBounceActivityId) return;
+    const appeared = recentActivities.find(a => a.uuid === pendingBounceActivityId);
+    if (!appeared) return;
+
+    const animMap = new Map(activityAnimations);
+    const anim = animMap.get(pendingBounceActivityId) || new Animated.Value(-16);
+    anim.setValue(-16);
+    animMap.set(pendingBounceActivityId, anim);
+    setActivityAnimations(animMap);
+
+    Animated.spring(anim, {
+      toValue: 0,
+      useNativeDriver: true,
+      bounciness: 14,
+      speed: 10,
+    }).start(() => {
+      setPendingBounceActivityId(null);
+    });
+  }, [pendingBounceActivityId, recentActivities]);
 
   const handleDisputeVoted = useCallback((disputeId: string) => {
     // Add dispute to voted set
