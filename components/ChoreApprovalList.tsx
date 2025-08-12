@@ -53,7 +53,14 @@ export function ChoreApprovalList() {
   }
 
   if (pendingApprovalChores.length === 0) {
-    return null;
+    return (
+      <View style={styles.container}>
+        <ThemedText type="subtitle">Vote on New Chores</ThemedText>
+        <View style={styles.emptyBox}>
+          <ThemedText style={styles.emptyText}>Nothing to vote on right now</ThemedText>
+        </View>
+      </View>
+    );
   }
 
   const handleVoteToggle = async (choreId: string) => {
@@ -129,5 +136,18 @@ const styles = StyleSheet.create({
   centered: {
     justifyContent: "center",
     alignItems: "center",
+  },
+  emptyBox: {
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+    backgroundColor: "#fafafa",
+    alignItems: "center",
+  },
+  emptyText: {
+    opacity: 0.6,
+    fontSize: 12,
   },
 });

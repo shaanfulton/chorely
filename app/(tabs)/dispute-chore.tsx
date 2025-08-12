@@ -223,32 +223,34 @@ export default function DisputeChoreScreen() {
         </ThemedText>
 
         {/* Active Disputes Section */}
-        {disputes.length > 0 && (
-          <>
-            <ThemedText type="subtitle" style={styles.sectionTitle}>
-              Active Disputes ({disputes.length})
-            </ThemedText>
-            {disputes
-              .sort((a, b) => {
-                const aVoted = userVotedDisputes.has(a.uuid);
-                const bVoted = userVotedDisputes.has(b.uuid);
-                // Put non-voted disputes first
-                if (aVoted && !bVoted) return 1;
-                if (!aVoted && bVoted) return -1;
-                return 0;
-              })
-              .map((dispute) => (
-                <DisputeCard
-                  key={dispute.uuid}
-                  dispute={dispute}
-                  onDisputeResolved={handleDisputeResolved}
-                  onDisputeExpanded={handleDisputeExpanded}
-                  onDisputeVoted={handleDisputeVoted}
-                  expanded={expandedDisputeId === dispute.uuid}
-                  targetPosition={disputeTargetPositions.get(dispute.uuid)}
-                />
-              ))}
-          </>
+        <ThemedText type="subtitle" style={styles.sectionTitle}>
+          Active Disputes ({disputes.length})
+        </ThemedText>
+        {disputes.length > 0 ? (
+          disputes
+            .sort((a, b) => {
+              const aVoted = userVotedDisputes.has(a.uuid);
+              const bVoted = userVotedDisputes.has(b.uuid);
+              // Put non-voted disputes first
+              if (aVoted && !bVoted) return 1;
+              if (!aVoted && bVoted) return -1;
+              return 0;
+            })
+            .map((dispute) => (
+              <DisputeCard
+                key={dispute.uuid}
+                dispute={dispute}
+                onDisputeResolved={handleDisputeResolved}
+                onDisputeExpanded={handleDisputeExpanded}
+                onDisputeVoted={handleDisputeVoted}
+                expanded={expandedDisputeId === dispute.uuid}
+                targetPosition={disputeTargetPositions.get(dispute.uuid)}
+              />
+            ))
+        ) : (
+          <ThemedView style={styles.emptyState}>
+            <ThemedText style={styles.emptyStateText}>No active disputes</ThemedText>
+          </ThemedView>
         )}
 
         {/* Recent Activities Section */}
@@ -268,7 +270,7 @@ export default function DisputeChoreScreen() {
         ) : (
           <ThemedView style={styles.emptyState}>
             <ThemedText style={styles.emptyStateText}>
-              No recent activities found.
+              No recent activities yet
             </ThemedText>
           </ThemedView>
         )}

@@ -309,11 +309,11 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
              <ThemedText type="defaultSemiBold" style={styles.choreName}>
                {dispute.choreName}
              </ThemedText>
+             <ThemedText style={styles.disputerInfo}>
+               Disputed by {dispute.disputerName}
+             </ThemedText>
              <ThemedText style={styles.completerInfo}>
                Completed by {getUserName(dispute.claimedByEmail)}
-             </ThemedText>
-                          <ThemedText style={styles.disputerInfo}>
-               Disputed by {dispute.disputerName}
              </ThemedText>
            </View>
            {dispute.imageUrl && (
@@ -363,11 +363,8 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
         <View style={styles.expandedContent}>
           {/* Dispute Details */}
           <View style={styles.disputeDetails}>
-            <ThemedText style={styles.description}>{dispute.choreDescription}</ThemedText>
-            <ThemedText style={styles.disputerName}>
-              Disputed by {dispute.disputerName}
-            </ThemedText>
             <ThemedText style={styles.reason}>Reason: {dispute.reason}</ThemedText>
+            <ThemedText style={styles.descriptionSmall}>{dispute.choreDescription}</ThemedText>
           </View>
 
           {/* Full Size Image */}
@@ -537,14 +534,20 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     marginBottom: 8,
   },
+  descriptionSmall: {
+    fontSize: 12,
+    opacity: 0.7,
+    marginTop: 6,
+  },
   disputerName: {
     fontSize: 12,
     opacity: 0.6,
     marginBottom: 4,
   },
   reason: {
-    fontSize: 12,
-    opacity: 0.8,
+    fontSize: 13,
+    fontWeight: "700",
+    opacity: 0.9,
   },
   photoSection: {
     marginBottom: 16,
