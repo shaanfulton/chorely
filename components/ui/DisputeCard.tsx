@@ -309,9 +309,6 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
              <ThemedText type="defaultSemiBold" style={styles.choreName}>
                {dispute.choreName}
              </ThemedText>
-             <ThemedText style={styles.disputerInfo}>
-               Disputed by {dispute.disputerName}
-             </ThemedText>
              <ThemedText style={styles.completerInfo}>
                Completed by {getUserName(dispute.claimedByEmail)}
              </ThemedText>
