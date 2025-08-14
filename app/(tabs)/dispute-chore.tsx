@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { ScrollView, StyleSheet, Alert, RefreshControl } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { ScrollView, StyleSheet, Alert, RefreshControl, Animated, Easing } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/ThemedText";
@@ -9,83 +9,203 @@ import { DisputeModal } from "@/components/ui/DisputeModal";
 import { RecentActivityItem } from "@/components/ui/RecentActivityItems";
 import { 
   getActiveDisputesAPI, 
-  approveDisputeAPI, 
-  rejectDisputeAPI,
   getRecentActivitiesAPI,
   createDisputeAPI,
   type Dispute,
-  type RecentActivity
-} from "@/data/mock";
+  type Chore
+} from "@/data/api";
+import { useGlobalChores } from "@/context/ChoreContext";
 
 export default function DisputeChoreScreen() {
   const insets = useSafeAreaInsets();
+  const { currentHome } = useGlobalChores();
   const [disputes, setDisputes] = useState<Dispute[]>([]);
-  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
-  const [selectedActivity, setSelectedActivity] = useState<RecentActivity | null>(null);
+  const [recentActivities, setRecentActivities] = useState<Chore[]>([]);
+  const [selectedActivity, setSelectedActivity] = useState<Chore | null>(null);
   const [disputeModalVisible, setDisputeModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [expandedDisputeId, setExpandedDisputeId] = useState<string | null>(null);
+  const [userVotedDisputes, setUserVotedDisputes] = useState<Set<string>>(new Set());
+  const [disputeTargetPositions, setDisputeTargetPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
+  const [activityAnimations, setActivityAnimations] = useState<Map<string, Animated.Value>>(new Map());
+  const [pendingBounceActivityId, setPendingBounceActivityId] = useState<string | null>(null);
 
-  const loadData = () => {
-    setDisputes(getActiveDisputesAPI());
-    setRecentActivities(getRecentActivitiesAPI());
-  };
+  const loadData = useCallback(async () => {
+    if (!currentHome?.id || loading) return;
+    
+    setLoading(true);
+    try {
+      const disputesData = await getActiveDisputesAPI();
+      const activitiesData = await getRecentActivitiesAPI({ 
+        homeId: currentHome.id,
+        timeFrame: "3d" 
+      });
+      
+      // Filter out activities that have active disputes
+      const disputedChoreIds = disputesData.map(dispute => dispute.choreId);
+      const filteredActivities = activitiesData.filter(activity => 
+        !disputedChoreIds.includes(activity.uuid)
+      );
+      
+      setDisputes(disputesData);
+      setRecentActivities(filteredActivities);
+      
+      // Calculate target positions for rejected disputes
+      const targetPositions = new Map<string, { x: number; y: number }>();
+      
+      disputesData.forEach((dispute) => {
+        // Calculate where this dispute would appear in recent activities if rejected
+        const rejectedChore: Chore = {
+          uuid: dispute.choreId,
+          name: dispute.choreName,
+          description: dispute.choreDescription,
+          time: new Date().toISOString(),
+          icon: dispute.choreIcon,
+          user_email: dispute.claimedByEmail,
+          status: "complete",
+          todos: [],
+          homeID: currentHome?.id || "",
+          points: 0,
+          approvalList: [],
+          completed_at: new Date().toISOString(),
+          claimed_at: null,
+        };
+        
+        // Find the correct position in recent activities
+        let insertIndex = 0;
+        for (let i = 0; i < filteredActivities.length; i++) {
+          const activityTime = new Date(filteredActivities[i].completed_at || 0);
+          const rejectedTime = new Date(rejectedChore.completed_at || 0);
+          if (activityTime < rejectedTime) {
+            insertIndex = i;
+            break;
+          }
+          insertIndex = i + 1;
+        }
+        
+        // Calculate Y position: disputes section height + target position in activities
+        const disputeCardHeight = 120; // Approximate height of collapsed dispute card
+        const activityItemHeight = 80; // Approximate height of activity item
+        const sectionTitleHeight = 50; // Height of section titles
+        const padding = 20; // Container padding
+        
+        // When this dispute is resolved, there will be one fewer dispute in the list
+        const remainingDisputes = disputesData.length - 1;
+        const disputesSectionHeight = (remainingDisputes * disputeCardHeight) + sectionTitleHeight + padding;
+        
+        // Calculate the target position more precisely
+        // The dispute card should end up exactly where the new activity item will appear
+        const targetY = disputesSectionHeight + (insertIndex * activityItemHeight) + sectionTitleHeight;
+        
+        targetPositions.set(dispute.uuid, { x: 0, y: targetY });
+      });
+      
+      setDisputeTargetPositions(targetPositions);
+    } catch (error) {
+      console.error('Failed to load data:', error);
+      // Show a simple error message if the backend is down
+      if (error instanceof Error && error.message.includes('Network request failed')) {
+        Alert.alert(
+          'Connection Error',
+          'Unable to connect to the server. Please try again later.',
+          [{ text: 'OK' }]
+        );
+      } else if (error instanceof Error && error.message.includes('Home') && error.message.includes('does not exist')) {
+        // Home ID has changed, need to refresh user data
+        Alert.alert(
+          'Session Expired',
+          'Your session has expired. Please log out and log back in.',
+          [{ text: 'OK' }]
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [currentHome?.id, loading]);
 
   useEffect(() => {
-    loadData();
+    if (currentHome?.id) {
+      loadData();
+    }
+  }, [currentHome?.id]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
+
+  const handleDisputeResolved = useCallback((resolvedDisputeId: string, resolutionType: "approved" | "rejected") => {
+    // Find the resolved dispute to get its chore info
+    const resolvedDispute = disputes.find(d => d.uuid === resolvedDisputeId);
+    
+    // Immediately remove the resolved dispute from local state
+    setDisputes(prevDisputes => prevDisputes.filter(d => d.uuid !== resolvedDisputeId));
+    
+    // Reset expanded dispute if it was the one that was resolved
+    if (expandedDisputeId === resolvedDisputeId) {
+      setExpandedDisputeId(null);
+    }
+    
+    // Remove from voted disputes set
+    setUserVotedDisputes(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(resolvedDisputeId);
+      return newSet;
+    });
+    if (resolutionType === "rejected" && resolvedDispute) {
+      setPendingBounceActivityId(resolvedDispute.choreId);
+    }
+    
+    // Let the DisputeCard animate as an overlay. After its animation completes,
+    // refresh from backend to swap to the authoritative list and avoid overlaps/gaps.
+    setTimeout(() => {
+      loadData();
+    }, 700); // match card slide duration + small buffer
+  }, [loadData, expandedDisputeId, disputes, currentHome?.id]);
+
+  useEffect(() => {
+    if (!pendingBounceActivityId) return;
+    const appeared = recentActivities.find(a => a.uuid === pendingBounceActivityId);
+    if (!appeared) return;
+
+    const animMap = new Map(activityAnimations);
+    const anim = animMap.get(pendingBounceActivityId) || new Animated.Value(-16);
+    anim.setValue(-16);
+    animMap.set(pendingBounceActivityId, anim);
+    setActivityAnimations(animMap);
+
+    Animated.spring(anim, {
+      toValue: 0,
+      useNativeDriver: true,
+      bounciness: 14,
+      speed: 10,
+    }).start(() => {
+      setPendingBounceActivityId(null);
+    });
+  }, [pendingBounceActivityId, recentActivities]);
+
+  const handleDisputeVoted = useCallback((disputeId: string) => {
+    // Add dispute to voted set
+    setUserVotedDisputes(prev => new Set(prev).add(disputeId));
   }, []);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadData();
-    setRefreshing(false);
-  };
+  const handleDisputeExpanded = useCallback((disputeId: string) => {
+    setExpandedDisputeId(expandedDisputeId === disputeId ? null : disputeId);
+  }, [expandedDisputeId]);
 
-  const handleApproveDispute = (uuid: string) => {
-    Alert.alert(
-      "Approve Dispute",
-      "Are you sure you want to approve this dispute?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Approve",
-          style: "destructive",
-          onPress: () => {
-            approveDisputeAPI(uuid);
-            loadData();
-            Alert.alert("Success", "Dispute approved successfully");
-          },
-        },
-      ]
-    );
-  };
-
-  const handleRejectDispute = (uuid: string) => {
-    Alert.alert(
-      "Reject Dispute",
-      "Are you sure you want to reject this dispute?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Reject",
-          style: "destructive",
-          onPress: () => {
-            rejectDisputeAPI(uuid);
-            loadData();
-            Alert.alert("Success", "Dispute rejected successfully");
-          },
-        },
-      ]
-    );
-  };
-
-  const handleDisputeActivity = (activity: RecentActivity) => {
+  const handleDisputeActivity = useCallback((activity: Chore) => {
     setSelectedActivity(activity);
     setDisputeModalVisible(true);
-  };
+  }, []);
 
-  const handleDisputeCreated = () => {
-    loadData();
-  };
+  const handleDisputeCreated = useCallback(() => {
+    // Add a small delay to prevent rapid API calls
+    setTimeout(() => {
+      loadData();
+    }, 500);
+  }, [loadData]);
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
@@ -103,20 +223,34 @@ export default function DisputeChoreScreen() {
         </ThemedText>
 
         {/* Active Disputes Section */}
-        {disputes.length > 0 && (
-          <>
-            <ThemedText type="subtitle" style={styles.sectionTitle}>
-              Active Disputes ({disputes.length})
-            </ThemedText>
-            {disputes.map((dispute) => (
+        <ThemedText type="subtitle" style={styles.sectionTitle}>
+          Active Disputes ({disputes.length})
+        </ThemedText>
+        {disputes.length > 0 ? (
+          disputes
+            .sort((a, b) => {
+              const aVoted = userVotedDisputes.has(a.uuid);
+              const bVoted = userVotedDisputes.has(b.uuid);
+              // Put non-voted disputes first
+              if (aVoted && !bVoted) return 1;
+              if (!aVoted && bVoted) return -1;
+              return 0;
+            })
+            .map((dispute) => (
               <DisputeCard
                 key={dispute.uuid}
                 dispute={dispute}
-                onApprove={handleApproveDispute}
-                onReject={handleRejectDispute}
+                onDisputeResolved={handleDisputeResolved}
+                onDisputeExpanded={handleDisputeExpanded}
+                onDisputeVoted={handleDisputeVoted}
+                expanded={expandedDisputeId === dispute.uuid}
+                targetPosition={disputeTargetPositions.get(dispute.uuid)}
               />
-            ))}
-          </>
+            ))
+        ) : (
+          <ThemedView style={styles.emptyState}>
+            <ThemedText style={styles.emptyStateText}>No active disputes</ThemedText>
+          </ThemedView>
         )}
 
         {/* Recent Activities Section */}
@@ -130,12 +264,13 @@ export default function DisputeChoreScreen() {
               key={activity.uuid}
               activity={activity}
               onDispute={handleDisputeActivity}
+              slideAnimation={activityAnimations.get(activity.uuid)}
             />
           ))
         ) : (
           <ThemedView style={styles.emptyState}>
             <ThemedText style={styles.emptyStateText}>
-              No recent activities found.
+              No recent activities yet
             </ThemedText>
           </ThemedView>
         )}

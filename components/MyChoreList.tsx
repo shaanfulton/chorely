@@ -23,33 +23,46 @@ export function MyChoreList() {
   }
 
   if (myChores.length === 0) {
-    return null;
+    return (
+      <View style={styles.container}>
+        <ThemedText type="subtitle">My Chores</ThemedText>
+        <View style={styles.emptyBox}>
+          <ThemedText style={styles.emptyText}>You have no chores right now</ThemedText>
+        </View>
+      </View>
+    );
   }
 
   const handleVerifyChore = async (chore: any) => {
-    if (chore && chore.status === "claimed") {
-      try {
-        setNavigatingChoreId(chore.uuid);
-        // Navigate to validation screen
-        router.push(`/chore-validate?uuid=${chore.uuid}`);
-      } finally {
-        setNavigatingChoreId(null);
-      }
+    if (navigatingChoreId) return; // guard against double taps
+    if (!chore || chore.status !== "claimed") return; // only allow claimed
+    try {
+
+      setNavigatingChoreId(chore.uuid);
+      router.push(`/chore-validate?uuid=${chore.uuid}`);
+    } finally {
+      setNavigatingChoreId(null);
     }
   };
+
+  if (myChores.length === 0) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>
       <ThemedText type="subtitle">My Chores</ThemedText>
       {myChores.map((chore) => (
         <ChoreListItem key={chore.uuid} chore={chore}>
-          <Button
-            title="Verify"
-            backgroundColor={Colors.metro.blue}
-            isLoading={navigatingChoreId === chore.uuid}
-            onPress={() => handleVerifyChore(chore)}
-            size="small"
-          />
+          {chore.status === "claimed" ? (
+            <Button
+              title="Verify"
+              backgroundColor={Colors.metro.blue}
+              isLoading={navigatingChoreId === chore.uuid}
+              onPress={() => handleVerifyChore(chore)}
+              size="small"
+            />
+          ) : null}
         </ChoreListItem>
       ))}
     </View>
@@ -65,5 +78,18 @@ const styles = StyleSheet.create({
   centered: {
     justifyContent: "center",
     alignItems: "center",
+  },
+  emptyBox: {
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+    backgroundColor: "#fafafa",
+    alignItems: "center",
+  },
+  emptyText: {
+    opacity: 0.6,
+    fontSize: 12,
   },
 });

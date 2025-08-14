@@ -47,6 +47,22 @@ export default function LoginScreen() {
     router.push("/signup");
   };
 
+  const handleQuickLogin = async (demoEmail: string) => {
+    setIsLoading(true);
+    try {
+      const success = await loginUser(demoEmail);
+      if (success) {
+        router.replace("/(tabs)");
+      } else {
+        Alert.alert("Login Failed", "Demo user not found. Please try again.");
+      }
+    } catch (error) {
+      Alert.alert("Error", "An error occurred during login. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -89,6 +105,34 @@ export default function LoginScreen() {
             <TouchableOpacity onPress={handleSignUp} disabled={isLoading}>
               <Text style={styles.signupLink}>Sign Up</Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Demo Users Quick Login */}
+          <View style={styles.demoSection}>
+            <Text style={styles.demoTitle}>Quick Demo Login</Text>
+            <Text style={styles.demoSubtitle}>
+              Try the app with these demo users:
+            </Text>
+
+            <View style={styles.demoButtons}>
+              <TouchableOpacity
+                style={[styles.demoButton, styles.aliceButton]}
+                onPress={() => handleQuickLogin("alice@demo.com")}
+                disabled={isLoading}
+              >
+                <Text style={styles.demoButtonText}>Alice</Text>
+                <Text style={styles.demoButtonSubtext}>alice@demo.com</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.demoButton, styles.bobButton]}
+                onPress={() => handleQuickLogin("bob@demo.com")}
+                disabled={isLoading}
+              >
+                <Text style={styles.demoButtonText}>Bob</Text>
+                <Text style={styles.demoButtonSubtext}>bob@demo.com</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </ThemedView>
@@ -167,5 +211,74 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#007AFF",
     fontWeight: "600",
+  },
+  demoSection: {
+    marginTop: 30,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: "#e1e1e1",
+  },
+  demoTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    textAlign: "center",
+    marginBottom: 8,
+    color: "#333",
+  },
+  demoSubtitle: {
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 16,
+    color: "#666",
+  },
+  demoButtons: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  demoButton: {
+    flex: 1,
+    minWidth: "48%",
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#e1e1e1",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  aliceButton: {
+    borderLeftWidth: 4,
+    borderLeftColor: "#4CAF50",
+  },
+  bobButton: {
+    borderLeftWidth: 4,
+    borderLeftColor: "#2196F3",
+  },
+  charlieButton: {
+    borderLeftWidth: 4,
+    borderLeftColor: "#FF9800",
+  },
+  dianaButton: {
+    borderLeftWidth: 4,
+    borderLeftColor: "#9C27B0",
+  },
+  demoButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 2,
+  },
+  demoButtonSubtext: {
+    fontSize: 11,
+    color: "#666",
   },
 });

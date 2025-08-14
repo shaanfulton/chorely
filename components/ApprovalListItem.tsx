@@ -1,4 +1,4 @@
-import { Chore } from "@/data/mock";
+import { Chore } from "@/data/api";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { Link } from "expo-router";
 import React from "react";

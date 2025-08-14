@@ -21,20 +21,18 @@ export function CreateHomeForm({
   const { createHome } = useGlobalChores();
   const [isCreating, setIsCreating] = useState(false);
   const [homeName, setHomeName] = useState("");
-  const [homeAddress, setHomeAddress] = useState("");
 
   const handleCreateHome = async () => {
-    if (!homeName.trim() || !homeAddress.trim()) {
-      Alert.alert("Error", "Please enter both home name and address");
+    if (!homeName.trim()) {
+      Alert.alert("Error", "Please enter a home name");
       return;
     }
 
     try {
       setIsLoading(true);
-      await createHome(homeName.trim(), homeAddress.trim());
+      await createHome(homeName.trim());
       Alert.alert("Success!", "Your home has been created successfully.");
       setHomeName("");
-      setHomeAddress("");
       setIsCreating(false);
     } catch (error) {
       Alert.alert("Error", "An error occurred. Please try again.");
@@ -65,15 +63,7 @@ export function CreateHomeForm({
             editable={!isLoading}
           />
 
-          <Text style={styles.inputLabel}>Address</Text>
-          <TextInput
-            style={styles.input}
-            value={homeAddress}
-            onChangeText={setHomeAddress}
-            placeholder="Enter address"
-            placeholderTextColor="#999"
-            editable={!isLoading}
-          />
+
 
           <View style={styles.buttonRow}>
             <TouchableOpacity
@@ -90,7 +80,6 @@ export function CreateHomeForm({
               onPress={() => {
                 setIsCreating(false);
                 setHomeName("");
-                setHomeAddress("");
               }}
               disabled={isLoading}
             >

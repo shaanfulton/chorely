@@ -5,12 +5,19 @@ services:
     build:
       context: https://github.com/lmmeqa/chorely-backend.git
       dockerfile: Dockerfile_demo
+    volumes:
+      - /app/uploads          # exclude uploads from local mount
+      - uploads_data:/app/uploads  # ephemeral uploads (cleared on restart)
     environment:
       - DATABASE_URL=postgres://postgres:password@db:5432/chorely
       - MUTE_DB_LOGS=${MUTE_DB_LOGS:-}
       - MUTE_API_LOGS=${MUTE_API_LOGS:-}
       - MUTE_ERROR_LOGS=${MUTE_ERROR_LOGS:-}
       - SHOW_API_PAYLOADS=${SHOW_API_PAYLOADS:-}
+    deploy:
+      resources:
+        limits:
+          memory: 4G
     ports:
       - "4000:4000"
     depends_on:
@@ -29,3 +36,4 @@ services:
 
 volumes:
   pgdata:
+  uploads_data:  # ephemeral volume for uploads

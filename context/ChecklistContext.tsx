@@ -12,6 +12,7 @@ interface ChecklistContextType {
   toggleItem: (itemName: string) => void;
   isAllCompleted: (totalItems: number) => boolean;
   resetCompleted: () => void;
+  clearAll: () => void;
 }
 
 const ChecklistContext = createContext<ChecklistContextType | undefined>(
@@ -37,6 +38,10 @@ export const ChecklistProvider = ({ children }: { children: ReactNode }) => {
     setCompletedItems(new Set());
   }, []);
 
+  const clearAll = useCallback(() => {
+    setCompletedItems(new Set());
+  }, []);
+
   const isAllCompleted = useCallback(
     (totalItems: number) => {
       return completedItems.size === totalItems;
@@ -50,8 +55,9 @@ export const ChecklistProvider = ({ children }: { children: ReactNode }) => {
       toggleItem,
       isAllCompleted,
       resetCompleted,
+      clearAll,
     }),
-    [completedItems, toggleItem, isAllCompleted, resetCompleted]
+    [completedItems, toggleItem, isAllCompleted, resetCompleted, clearAll]
   );
 
   return (
