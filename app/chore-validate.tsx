@@ -81,8 +81,8 @@ export default function ChoreValidate() {
 
         // Open the system camera UI
         const result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          quality: 0.7,
+          mediaTypes: ["images"],
+          quality: 0.5, // Reduced quality for smaller file size
           allowsEditing: false,
           exif: false,
           base64: false,
@@ -95,13 +95,27 @@ export default function ChoreValidate() {
 
         const asset = result.assets?.[0];
         if (asset?.uri) {
-          setCapturedUri(asset.uri);
-          setEditedUri(asset.uri);
+          // Compress the image to reduce file size
+          try {
+            const compressedResult = await ImageManipulator.manipulateAsync(
+              asset.uri,
+              [{ resize: { width: 1024 } }], // Resize to max 1024px width
+              { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
+            );
+            setCapturedUri(compressedResult.uri);
+            setEditedUri(compressedResult.uri);
+          } catch (error) {
+            console.error("Error compressing image:", error);
+            setCapturedUri(asset.uri); // Fallback to original
+            setEditedUri(asset.uri);
+          }
           setIsConfirming(true);
           // measure image
           RNImage.getSize(asset.uri, (w: number, h: number) => {
             setNaturalSize({ width: w, height: h });
-          }, () => {});
+          }, () => {
+            setNaturalSize(null);
+          });
           setIsAnimating(false);
           return; // Wait for user to confirm
         }
@@ -165,7 +179,7 @@ export default function ChoreValidate() {
     if (!uuid || !editedUri) return;
     setIsAnimating(true);
     try {
-      await completeChore(uuid as string);
+      await completeChore(uuid as string, editedUri);
 
       Animated.sequence([
         Animated.timing(backdropOpacity, {

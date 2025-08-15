@@ -168,8 +168,8 @@ export function DisputeModal({
 
       // Open the system camera UI
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.7,
+        mediaTypes: ["images"],
+        quality: 0.5, // Reduced quality for smaller file size
         allowsEditing: false,
         exif: false,
         base64: false,

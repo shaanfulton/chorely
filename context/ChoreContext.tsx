@@ -416,7 +416,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
 
   // Complete chore with optimistic updates
   const completeChore = useCallback(
-    async (choreUuid: string) => {
+    async (choreUuid: string, photoUri?: string) => {
       const choreToUpdate = myChores.find((chore) => chore.uuid === choreUuid);
       if (!choreToUpdate || !currentUser || !currentHome) return;
 
@@ -434,7 +434,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
 
       try {
         // Make API calls
-        completeChoreAPI(choreUuid);
+        completeChoreAPI(choreUuid, photoUri);
         updateUserPointsAPI(
           currentUser.email,
           currentHome.id,

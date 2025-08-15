@@ -7,7 +7,6 @@ type ChoreStatus = "unapproved" | "unclaimed" | "claimed" | "complete";
 
 export interface TodoItem {
   name: string;
-  description: string;
 }
 
 export interface User {
@@ -46,6 +45,7 @@ export interface Dispute {
   choreName: string;
   choreDescription: string;
   choreIcon: string;
+  chorePoints: number;
   disputerEmail: string;
   disputerName: string;
   reason: string;
@@ -263,9 +263,15 @@ export async function getChoreByIdAPI(uuid: string): Promise<Chore | undefined> 
   const row = await http<any>(`/chores/${encodeURIComponent(uuid)}`);
   const chore = mapChoreRow(row);
   try {
+    console.log("Fetching todos for chore:", uuid);
     const todos = await getTodoItemsForChore(uuid);
-    chore.todos = todos;
-  } catch {}
+    console.log("Fetched todos:", todos);
+    // Ensure todos is always an array
+    chore.todos = Array.isArray(todos) ? todos : [];
+  } catch (error) {
+    console.error("Failed to fetch todos for chore:", uuid, error);
+    chore.todos = [];
+  }
   return chore;
 }
 
@@ -276,8 +282,33 @@ export async function claimChoreAPI(uuid: string, email: string): Promise<void> 
   });
 }
 
-export async function completeChoreAPI(uuid: string): Promise<void> {
-  await http(`/chores/${encodeURIComponent(uuid)}/complete`, { method: "PATCH" });
+export async function completeChoreAPI(uuid: string, photoUri?: string): Promise<void> {
+  if (photoUri) {
+    // Upload with photo
+    const form = new FormData();
+    form.append("image", {
+      uri: photoUri,
+      name: "chore-completion.jpg",
+      type: "image/jpeg",
+    } as any);
+    
+    const res = await fetch(`${API_BASE}/chores/${encodeURIComponent(uuid)}/complete`, {
+      method: "PATCH",
+      body: form,
+    });
+    
+    if (!res.ok) {
+      let message = `HTTP ${res.status}`;
+      try {
+        const j = (await res.json()) as any;
+        if (j && j.error) message = j.error;
+      } catch {}
+      throw new Error(message);
+    }
+  } else {
+    // Complete without photo
+    await http(`/chores/${encodeURIComponent(uuid)}/complete`, { method: "PATCH" });
+  }
 }
 
 // Approval voting
@@ -370,13 +401,17 @@ export async function updateHomeWeeklyQuotaAPI(
 
 // Todos
 export async function getTodoItemsForChore(choreId: string): Promise<TodoItem[]> {
+  console.log("Calling getTodoItemsForChore with choreId:", choreId);
   const rows = await http<any[]>(`/todos/chore/${encodeURIComponent(choreId)}`);
-  return rows.map((r) => ({ name: r.name, description: r.description }));
+  console.log("Backend returned todo rows:", rows);
+  // Ensure rows is an array before mapping
+  const safeRows = Array.isArray(rows) ? rows : [];
+  return safeRows.map((r) => ({ name: r.name }));
 }
 
-export async function createTodoAPI(input: { chore_id: string; name: string; description: string; order?: number }): Promise<TodoItem> {
+export async function createTodoAPI(input: { chore_id: string; name: string; order?: number }): Promise<TodoItem> {
   const row = await http<any>(`/todos`, { method: "POST", body: JSON.stringify(input) });
-  return { name: row.name, description: row.description };
+  return { name: row.name };
 }
 
 export async function generateTodosForChoreAPI(choreName: string, choreDescription: string): Promise<TodoItem[]> {
@@ -384,7 +419,7 @@ export async function generateTodosForChoreAPI(choreName: string, choreDescripti
     method: "POST",
     body: JSON.stringify({ choreName, choreDescription }),
   });
-  return (res.todos || []).map((t: any) => ({ name: t.name, description: t.description }));
+  return (res.todos || []).map((t: any) => ({ name: t.name }));
 }
 
 // Disputes & Activity
@@ -397,6 +432,7 @@ export async function getActiveDisputesAPI(): Promise<Dispute[]> {
     const choreIcon = d.chore_icon ?? d.choreIcon ?? "package";
     const claimedByEmail = d.chore_user_email ?? d.claimedByEmail ?? "";
     const chorePhoto = d.chore_photo_url ?? d.chorePhotoUrl;
+    const chorePoints = d.chore_points ?? 0;
     // Normalize image URL: prefer dispute image; if relative, prefix with API_BASE
     let imageUrl: string | undefined = d.image_url || chorePhoto || undefined;
     if (imageUrl && imageUrl.startsWith("/")) {
@@ -408,6 +444,7 @@ export async function getActiveDisputesAPI(): Promise<Dispute[]> {
       choreName: choreName || "Chore",
       choreDescription: choreDescription || "",
       choreIcon,
+      chorePoints,
       disputerEmail: d.disputer_email,
       disputerName: inferUserNameFromEmail(d.disputer_email),
       reason: d.reason,

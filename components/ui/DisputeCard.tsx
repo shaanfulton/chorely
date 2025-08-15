@@ -40,12 +40,44 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
     setIsResolved(false);
   }, [dispute.uuid]);
 
-  // Handle initial expansion state when component mounts
+  // Handle initial expansion state when component mounts and refresh vote status when expanded
   useEffect(() => {
     if (expanded) {
       expandAnim.setValue(1);
+      
+      // Refresh vote status when dispute is expanded
+      const refreshVoteStatus = async () => {
+        if (!dispute.uuid || !currentUser?.email) return;
+        
+        try {
+          const status = await getDisputeVoteStatusAPI(dispute.uuid);
+          setVoteStatus(status);
+          
+          // Check if dispute is now resolved
+          if (status && (status.is_approved || status.is_rejected)) {
+            const isApproved = status.is_approved;
+            setResolutionType(isApproved ? "approved" : "rejected");
+            setVoteFeedbackMessage(`Dispute ${isApproved ? 'approved' : 'rejected'}!`);
+            setShowVoteFeedback(true);
+            onDisputeExpanded(dispute.uuid);
+            setIsResolved(true);
+            Animated.timing(slideAnim, {
+              toValue: isApproved ? -1 : 2,
+              duration: 600,
+              useNativeDriver: true,
+              easing: Easing.linear,
+            }).start(() => {
+              onDisputeResolved(dispute.uuid, isApproved ? "approved" : "rejected");
+            });
+          }
+        } catch (error) {
+          console.log("Error refreshing vote status:", error);
+        }
+      };
+      
+      refreshVoteStatus();
     }
-  }, [expanded]); // Include expanded in dependencies
+  }, [expanded, dispute.uuid, currentUser?.email]); // Include expanded in dependencies
 
   // Animate expansion/collapse
   useEffect(() => {
@@ -123,7 +155,43 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
     };
 
     loadVoteData();
-  }, [dispute.uuid, currentUser?.email, dispute.claimedByEmail]);
+
+    // Set up polling to refresh vote status every 5 seconds
+    const pollInterval = setInterval(async () => {
+      if (!dispute.uuid || !currentUser?.email || isResolved) return;
+      
+      try {
+        const status = await getDisputeVoteStatusAPI(dispute.uuid);
+        setVoteStatus(status);
+        
+        // Check if dispute is now resolved
+        if (status && (status.is_approved || status.is_rejected)) {
+          const isApproved = status.is_approved;
+          setResolutionType(isApproved ? "approved" : "rejected");
+          setVoteFeedbackMessage(`Dispute ${isApproved ? 'approved' : 'rejected'}!`);
+          setShowVoteFeedback(true);
+          onDisputeExpanded(dispute.uuid);
+          setIsResolved(true);
+          Animated.timing(slideAnim, {
+            toValue: isApproved ? -1 : 2,
+            duration: 600,
+            useNativeDriver: true,
+            easing: Easing.linear,
+          }).start(() => {
+            onDisputeResolved(dispute.uuid, isApproved ? "approved" : "rejected");
+          });
+        }
+      } catch (error) {
+        // Silently handle errors during polling
+        console.log("Polling error:", error);
+      }
+    }, 5000); // Poll every 5 seconds
+
+    // Cleanup interval on unmount or when dependencies change
+    return () => {
+      clearInterval(pollInterval);
+    };
+  }, [dispute.uuid, currentUser?.email, dispute.claimedByEmail, isResolved]);
 
   const handleVote = async (vote: VoteType) => {
     if (!currentUser?.email || isVoting) return;
