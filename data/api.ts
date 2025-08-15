@@ -216,7 +216,7 @@ export async function createChoreAPI(
   choreData: Omit<
     Chore,
     "uuid" | "status" | "user_email" | "todos" | "homeID" | "approvalList"
-  >,
+  > & { user_email?: string },
   homeID: string
 ): Promise<Chore> {
   const payload = {
@@ -226,6 +226,7 @@ export async function createChoreAPI(
     icon: choreData.icon,
     home_id: homeID,
     points: choreData.points,
+    ...(choreData.user_email && { user_email: choreData.user_email }),
   };
   const row = await http<any>(`/chores`, { method: "POST", body: JSON.stringify(payload) });
   const chore = mapChoreRow(row);
@@ -456,12 +457,12 @@ export async function getActiveDisputesAPI(): Promise<Dispute[]> {
   });
 }
 
-export async function approveDisputeAPI(uuid: string): Promise<void> {
-  await http(`/disputes/${encodeURIComponent(uuid)}/approve`, { method: "PATCH" });
+export async function sustainDisputeAPI(uuid: string): Promise<void> {
+  await http(`/disputes/${encodeURIComponent(uuid)}/sustain`, { method: "PATCH" });
 }
 
-export async function rejectDisputeAPI(uuid: string): Promise<void> {
-  await http(`/disputes/${encodeURIComponent(uuid)}/reject`, { method: "PATCH" });
+export async function overruleDisputeAPI(uuid: string): Promise<void> {
+  await http(`/disputes/${encodeURIComponent(uuid)}/overrule`, { method: "PATCH" });
 }
 
 // Fetch a dispute by id (to check final resolution status when vote status 404s)
@@ -487,17 +488,17 @@ export async function getDisputeByIdAPI(uuid: string): Promise<{
 }
 
 // Dispute voting types and interfaces
-export type VoteType = "approve" | "reject";
+export type VoteType = "sustain" | "overrule";
 
 export interface DisputeVoteStatus {
   dispute_uuid: string;
-  approve_votes: number;
-  reject_votes: number;
+  sustain_votes: number;
+  overrule_votes: number;
   total_votes: number;
   required_votes: number;
   total_eligible_voters: number;
-  is_approved: boolean;
-  is_rejected: boolean;
+  is_sustained: boolean;
+  is_overruled: boolean;
   is_24_hours_passed: boolean;
   hours_since_creation: number;
   voters: {
@@ -509,7 +510,7 @@ export interface DisputeVoteStatus {
 // Dispute voting API functions
 export async function voteOnDisputeAPI(disputeUuid: string, userEmail: string, vote: VoteType): Promise<void> {
   await http(`/dispute-votes/${encodeURIComponent(disputeUuid)}/vote`, {
-    method: "POST",
+    method: "POST", // TODO: change to PATCH when backend is updated          
     body: JSON.stringify({ userEmail, vote })
   });
 }

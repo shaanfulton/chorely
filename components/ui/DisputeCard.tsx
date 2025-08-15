@@ -10,7 +10,7 @@ import { ThemedView } from "./ThemedView";
 
 interface DisputeCardProps {
   dispute: Dispute;
-  onDisputeResolved: (disputeId: string, resolutionType: "approved" | "rejected") => void;
+  onDisputeResolved: (disputeId: string, resolutionType: "sustained" | "overruled") => void;
   onDisputeExpanded: (disputeId: string) => void;
   onDisputeVoted: (disputeId: string) => void;
   expanded: boolean;
@@ -32,7 +32,7 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
   
   const [showVoteFeedback, setShowVoteFeedback] = useState(false);
   const [voteFeedbackMessage, setVoteFeedbackMessage] = useState("");
-  const [resolutionType, setResolutionType] = useState<"approved" | "rejected" | null>(null);
+  const [resolutionType, setResolutionType] = useState<"sustained" | "overruled" | null>(null);
   const [userVoteDisplay, setUserVoteDisplay] = useState<VoteType | null>(null);
 
   // Reset resolved state when dispute changes
@@ -53,23 +53,23 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
           const status = await getDisputeVoteStatusAPI(dispute.uuid);
           setVoteStatus(status);
           
-          // Check if dispute is now resolved
-          if (status && (status.is_approved || status.is_rejected)) {
-            const isApproved = status.is_approved;
-            setResolutionType(isApproved ? "approved" : "rejected");
-            setVoteFeedbackMessage(`Dispute ${isApproved ? 'approved' : 'rejected'}!`);
-            setShowVoteFeedback(true);
-            onDisputeExpanded(dispute.uuid);
-            setIsResolved(true);
-            Animated.timing(slideAnim, {
-              toValue: isApproved ? -1 : 2,
-              duration: 600,
-              useNativeDriver: true,
-              easing: Easing.linear,
-            }).start(() => {
-              onDisputeResolved(dispute.uuid, isApproved ? "approved" : "rejected");
-            });
-          }
+                  // Check if dispute is now resolved
+        if (status && (status.is_sustained || status.is_overruled)) {
+          const isSustained = status.is_sustained;
+          setResolutionType(isSustained ? "sustained" : "overruled");
+          setVoteFeedbackMessage(`Dispute ${isSustained ? 'sustained' : 'overruled'}!`);
+          setShowVoteFeedback(true);
+          onDisputeExpanded(dispute.uuid);
+          setIsResolved(true);
+          Animated.timing(slideAnim, {
+            toValue: isSustained ? -1 : 2,
+            duration: 600,
+            useNativeDriver: true,
+            easing: Easing.linear,
+          }).start(() => {
+            onDisputeResolved(dispute.uuid, isSustained ? "sustained" : "overruled");
+          });
+        }
         } catch (error) {
           console.log("Error refreshing vote status:", error);
         }
@@ -103,27 +103,27 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
     try {
       const row = await getDisputeByIdAPI(dispute.uuid);
       if (!row) {
-        onDisputeResolved(dispute.uuid, "approved");
+        onDisputeResolved(dispute.uuid, "sustained");
         return;
       }
       if (row.status === "approved" || row.status === "rejected") {
-        const isApproved = row.status === "approved";
-        setResolutionType(isApproved ? "approved" : "rejected");
-        setVoteFeedbackMessage(`Dispute ${isApproved ? "approved" : "rejected"}!`);
+        const isSustained = row.status === "approved";
+        setResolutionType(isSustained ? "sustained" : "overruled");
+        setVoteFeedbackMessage(`Dispute ${isSustained ? "sustained" : "overruled"}!`);
         setShowVoteFeedback(true);
         onDisputeExpanded(dispute.uuid);
         setIsResolved(true);
         Animated.timing(slideAnim, {
-          toValue: isApproved ? -1 : 2,
+          toValue: isSustained ? -1 : 2,
           duration: 600,
           useNativeDriver: true,
           easing: Easing.linear,
         }).start(() => {
-          onDisputeResolved(dispute.uuid, isApproved ? "approved" : "rejected");
+          onDisputeResolved(dispute.uuid, isSustained ? "sustained" : "overruled");
         });
       }
     } catch (e) {
-      onDisputeResolved(dispute.uuid, "approved");
+      onDisputeResolved(dispute.uuid, "sustained");
     }
   };
 
@@ -144,7 +144,7 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
         const canUserVote = dispute.claimedByEmail !== currentUser.email;
         setCanVote(canUserVote);
         
-        if (status && !status.is_approved && !status.is_rejected) {
+        if (status && !status.is_sustained && !status.is_overruled) {
           setIsResolved(false);
         }
       } catch (error) {
@@ -155,30 +155,34 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
     };
 
     loadVoteData();
+  }, [dispute.uuid, currentUser?.email, dispute.claimedByEmail, isResolved]);
 
-    // Set up polling to refresh vote status every 5 seconds
+  // Set up polling to refresh vote status every 5 seconds ONLY when expanded
+  useEffect(() => {
+    if (!expanded || !dispute.uuid || !currentUser?.email || isResolved) {
+      return;
+    }
+
     const pollInterval = setInterval(async () => {
-      if (!dispute.uuid || !currentUser?.email || isResolved) return;
-      
       try {
         const status = await getDisputeVoteStatusAPI(dispute.uuid);
         setVoteStatus(status);
         
         // Check if dispute is now resolved
-        if (status && (status.is_approved || status.is_rejected)) {
-          const isApproved = status.is_approved;
-          setResolutionType(isApproved ? "approved" : "rejected");
-          setVoteFeedbackMessage(`Dispute ${isApproved ? 'approved' : 'rejected'}!`);
+        if (status && (status.is_sustained || status.is_overruled)) {
+          const isSustained = status.is_sustained;
+          setResolutionType(isSustained ? "sustained" : "overruled");
+          setVoteFeedbackMessage(`Dispute ${isSustained ? 'sustained' : 'overruled'}!`);
           setShowVoteFeedback(true);
           onDisputeExpanded(dispute.uuid);
           setIsResolved(true);
           Animated.timing(slideAnim, {
-            toValue: isApproved ? -1 : 2,
+            toValue: isSustained ? -1 : 2,
             duration: 600,
             useNativeDriver: true,
             easing: Easing.linear,
           }).start(() => {
-            onDisputeResolved(dispute.uuid, isApproved ? "approved" : "rejected");
+            onDisputeResolved(dispute.uuid, isSustained ? "sustained" : "overruled");
           });
         }
       } catch (error) {
@@ -191,7 +195,7 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
     return () => {
       clearInterval(pollInterval);
     };
-  }, [dispute.uuid, currentUser?.email, dispute.claimedByEmail, isResolved]);
+  }, [expanded, dispute.uuid, currentUser?.email, isResolved]);
 
   const handleVote = async (vote: VoteType) => {
     if (!currentUser?.email || isVoting) return;
@@ -205,14 +209,14 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
         if (!prevStatus) return;
         setVoteStatus((s) => {
           if (!s) return s;
-          let approve = s.approve_votes;
-          let reject = s.reject_votes;
-          let total = s.total_votes;
-          if (from === "approve") { approve = Math.max(0, approve - 1); total = Math.max(0, total - 1); }
-          if (from === "reject")  { reject  = Math.max(0, reject  - 1); total = Math.max(0, total - 1); }
-          if (to === "approve")   { approve += 1; total += 1; }
-          if (to === "reject")    { reject  += 1; total += 1; }
-          return { ...s, approve_votes: approve, reject_votes: reject, total_votes: total };
+                  let sustain = s.sustain_votes;
+        let overrule = s.overrule_votes;
+        let total = s.total_votes;
+        if (from === "sustain") { sustain = Math.max(0, sustain - 1); total = Math.max(0, total - 1); }
+        if (from === "overrule")  { overrule  = Math.max(0, overrule  - 1); total = Math.max(0, total - 1); }
+        if (to === "sustain")   { sustain += 1; total += 1; }
+        if (to === "overrule")    { overrule  += 1; total += 1; }
+        return { ...s, sustain_votes: sustain, overrule_votes: overrule, total_votes: total };
         });
       };
       
@@ -247,22 +251,22 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
       }
 
       // Check if dispute is resolved
-      if (newStatus && (newStatus.is_approved || newStatus.is_rejected)) {
-        const isApproved = newStatus.is_approved;
-        setResolutionType(isApproved ? "approved" : "rejected");
-        setVoteFeedbackMessage(`Dispute ${isApproved ? 'approved' : 'rejected'}!`);
-        setShowVoteFeedback(true);
-        onDisputeExpanded(dispute.uuid);
-        setIsResolved(true);
-        Animated.timing(slideAnim, {
-          toValue: isApproved ? -1 : 2,
-          duration: 600,
-          useNativeDriver: true,
-          easing: Easing.linear,
-        }).start(() => {
-          onDisputeResolved(dispute.uuid, isApproved ? "approved" : "rejected");
-        });
-      }
+              if (newStatus && (newStatus.is_sustained || newStatus.is_overruled)) {
+          const isSustained = newStatus.is_sustained;
+          setResolutionType(isSustained ? "sustained" : "overruled");
+          setVoteFeedbackMessage(`Dispute ${isSustained ? 'sustained' : 'overruled'}!`);
+          setShowVoteFeedback(true);
+          onDisputeExpanded(dispute.uuid);
+          setIsResolved(true);
+          Animated.timing(slideAnim, {
+            toValue: isSustained ? -1 : 2,
+            duration: 600,
+            useNativeDriver: true,
+            easing: Easing.linear,
+          }).start(() => {
+            onDisputeResolved(dispute.uuid, isSustained ? "sustained" : "overruled");
+          });
+        }
     } catch (error) {
       setVoteStatus(null);
       if (error instanceof Error && error.message.includes("Network request failed")) {
@@ -314,7 +318,7 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
       {showVoteFeedback && (
         <View style={[
           styles.feedbackToast, 
-          voteFeedbackMessage.includes('approved') || voteFeedbackMessage.includes('rejected') 
+          voteFeedbackMessage.includes('sustained') || voteFeedbackMessage.includes('overruled') 
             ? styles.resolutionToast 
             : null
         ]}>
@@ -356,10 +360,10 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
           ) : userVoteDisplay ? (
             <View style={[
               styles.voteSignifier,
-              userVoteDisplay === "approve" ? styles.approveSignifier : styles.rejectSignifier
+              userVoteDisplay === "sustain" ? styles.approveSignifier : styles.rejectSignifier
             ]}>
               <ThemedText style={styles.voteSignifierText}>
-                {userVoteDisplay === "approve" ? "✓" : "✗"}
+                {userVoteDisplay === "sustain" ? "✓" : "✗"}
               </ThemedText>
             </View>
           ) : null}
@@ -415,13 +419,13 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
                 <View style={styles.voteCount}>
                   <Check size={16} color="#4CAF50" />
                   <ThemedText style={styles.voteCountText}>
-                    {voteStatus.approve_votes} Approve
+                    {voteStatus.sustain_votes} Sustain
                   </ThemedText>
                 </View>
                 <View style={styles.voteCount}>
                   <X size={16} color="#F44336" />
                   <ThemedText style={styles.voteCountText}>
-                    {voteStatus.reject_votes} Reject
+                    {voteStatus.overrule_votes} Overrule
                   </ThemedText>
                 </View>
               </View>
@@ -437,27 +441,27 @@ export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onD
                 style={[
                   styles.actionButton,
                   styles.approveButton,
-                  userVote === "approve" && styles.selectedButton,
+                  userVote === "sustain" && styles.selectedButton,
                   isVoting && styles.disabledButton
                 ]}
-                onPress={() => handleVote("approve")}
+                                  onPress={() => handleVote("sustain")}
                 disabled={isVoting}
               >
                 <Check size={16} color="#fff" />
-                <ThemedText style={styles.buttonText}>Approve</ThemedText>
+                                  <ThemedText style={styles.buttonText}>Sustain</ThemedText>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   styles.actionButton,
                   styles.rejectButton,
-                  userVote === "reject" && styles.selectedButton,
+                  userVote === "overrule" && styles.selectedButton,
                   isVoting && styles.disabledButton
                 ]}
-                onPress={() => handleVote("reject")}
+                                  onPress={() => handleVote("overrule")}
                 disabled={isVoting}
               >
                 <X size={16} color="#fff" />
-                <ThemedText style={styles.buttonText}>Reject</ThemedText>
+                                  <ThemedText style={styles.buttonText}>Overrule</ThemedText>
               </TouchableOpacity>
             </View>
           )}

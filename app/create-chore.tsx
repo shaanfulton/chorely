@@ -19,7 +19,7 @@ import {
 
 export default function CreateChoreScreen() {
   const params = useLocalSearchParams();
-  const { createChore } = useGlobalChores();
+  const { createChore, currentUser } = useGlobalChores();
 
   // Parse the chore data from params if it exists
   const choreData = params.choreData
@@ -60,6 +60,7 @@ export default function CreateChoreScreen() {
         time: dueDateISO,
         icon: choreIcon,
         points: 10, // Default points value
+        user_email: currentUser?.email, // Include creator's email for auto-vote
       });
 
       Alert.alert(

@@ -569,7 +569,7 @@ export function GlobalChoreProvider({ children }: GlobalChoreProviderProps) {
 
       try {
         // Make API call and get the real chore with proper UUID
-        const newChore = await createChoreAPI(choreData, currentHome.id);
+        const newChore = await createChoreAPI({ ...choreData, user_email: currentUser?.email }, currentHome.id);
 
         // Replace the temporary chore with the real one
         const finalPending = updatedPending.map((chore) =>

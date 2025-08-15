@@ -8,8 +8,8 @@ import { ThemedView } from "@/components/ThemedView";
 import { DisputeCard } from "@/components/ui/DisputeCard";
 import { DisputeModal } from "@/components/ui/DisputeModal";
 import { RecentActivityItem } from "@/components/ui/RecentActivityItems";
-import { 
-  getActiveDisputesAPI, 
+import {
+  getActiveDisputesAPI,
   getRecentActivitiesAPI,
   createDisputeAPI,
   type Dispute,
@@ -38,30 +38,30 @@ export default function DisputeChoreScreen() {
 
   const loadData = useCallback(async () => {
     if (!currentHome?.id || loading) return;
-    
+
     setLoading(true);
     try {
       const disputesData = await getActiveDisputesAPI();
-      const activitiesData = await getRecentActivitiesAPI({ 
+      const activitiesData = await getRecentActivitiesAPI({
         homeId: currentHome.id,
-        timeFrame: "3d" 
+        timeFrame: "3d"
       });
-      
+
       // Filter out activities that have active disputes
       const disputedChoreIds = disputesData.map(dispute => dispute.choreId);
-      const filteredActivities = activitiesData.filter(activity => 
+      const filteredActivities = activitiesData.filter(activity =>
         !disputedChoreIds.includes(activity.uuid)
       );
-      
+
       setDisputes(disputesData);
       setRecentActivities(filteredActivities);
-      
-      // Calculate target positions for rejected disputes
+
+      // Calculate target positions for overruled disputes
       const targetPositions = new Map<string, { x: number; y: number }>();
-      
+
       disputesData.forEach((dispute) => {
-        // Calculate where this dispute would appear in recent activities if rejected
-        const rejectedChore: Chore = {
+        // Calculate where this dispute would appear in recent activities if overruled
+        const overruledChore: Chore = {
           uuid: dispute.choreId,
           name: dispute.choreName,
           description: dispute.choreDescription,
@@ -76,36 +76,36 @@ export default function DisputeChoreScreen() {
           completed_at: new Date().toISOString(),
           claimed_at: null,
         };
-        
+
         // Find the correct position in recent activities
         let insertIndex = 0;
         for (let i = 0; i < filteredActivities.length; i++) {
           const activityTime = new Date(filteredActivities[i].completed_at || 0);
-          const rejectedTime = new Date(rejectedChore.completed_at || 0);
-          if (activityTime < rejectedTime) {
+          const overruledTime = new Date(overruledChore.completed_at || 0);
+          if (activityTime < overruledTime) {
             insertIndex = i;
             break;
           }
           insertIndex = i + 1;
         }
-        
+
         // Calculate Y position: disputes section height + target position in activities
         const disputeCardHeight = 120; // Approximate height of collapsed dispute card
         const activityItemHeight = 80; // Approximate height of activity item
         const sectionTitleHeight = 50; // Height of section titles
         const padding = 20; // Container padding
-        
+
         // When this dispute is resolved, there will be one fewer dispute in the list
         const remainingDisputes = disputesData.length - 1;
         const disputesSectionHeight = (remainingDisputes * disputeCardHeight) + sectionTitleHeight + padding;
-        
+
         // Calculate the target position more precisely
         // The dispute card should end up exactly where the new activity item will appear
         const targetY = disputesSectionHeight + (insertIndex * activityItemHeight) + sectionTitleHeight;
-        
+
         targetPositions.set(dispute.uuid, { x: 0, y: targetY });
       });
-      
+
       setDisputeTargetPositions(targetPositions);
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -142,7 +142,7 @@ export default function DisputeChoreScreen() {
       if (disputeExists) {
         // Always expand when openDisputeId is provided (from "Your Points" click)
         setExpandedDisputeId(openDisputeId);
-        
+
         setTimeout(() => {
           if (scrollViewRef.current) {
             const disputeIndex = disputes.findIndex(d => d.uuid === openDisputeId);
@@ -178,28 +178,32 @@ export default function DisputeChoreScreen() {
     setRefreshing(false);
   }, [loadData]);
 
-  const handleDisputeResolved = useCallback((resolvedDisputeId: string, resolutionType: "approved" | "rejected") => {
+  const handleDisputeResolved = useCallback((resolvedDisputeId: string, resolutionType: "sustained" | "overruled") => {
     // Find the resolved dispute to get its chore info
     const resolvedDispute = disputes.find(d => d.uuid === resolvedDisputeId);
-    
-    // Immediately remove the resolved dispute from local state
-    setDisputes(prevDisputes => prevDisputes.filter(d => d.uuid !== resolvedDisputeId));
-    
-    // Reset expanded dispute if it was the one that was resolved
-    if (expandedDisputeId === resolvedDisputeId) {
-      setExpandedDisputeId(null);
-    }
-    
-    // Remove from voted disputes set
-    setUserVotedDisputes(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(resolvedDisputeId);
-      return newSet;
-    });
-    if (resolutionType === "rejected" && resolvedDispute) {
-      setPendingBounceActivityId(resolvedDispute.choreId);
-    }
-    
+
+    // Use setTimeout to defer state updates and avoid React render phase issues
+    setTimeout(() => {
+      // Immediately remove the resolved dispute from local state
+      setDisputes(prevDisputes => prevDisputes.filter(d => d.uuid !== resolvedDisputeId));
+
+      // Reset expanded dispute if it was the one that was resolved
+      if (expandedDisputeId === resolvedDisputeId) {
+        setExpandedDisputeId(null);
+      }
+
+      // Remove from voted disputes set
+      setUserVotedDisputes(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(resolvedDisputeId);
+        return newSet;
+      });
+      
+      if (resolutionType === "overruled" && resolvedDispute) {
+        setPendingBounceActivityId(resolvedDispute.choreId);
+      }
+    }, 0);
+
     // Let the DisputeCard animate as an overlay. After its animation completes,
     // refresh from backend to swap to the authoritative list and avoid overlaps/gaps.
     setTimeout(() => {
@@ -303,7 +307,7 @@ export default function DisputeChoreScreen() {
         <ThemedText type="subtitle" style={styles.sectionTitle}>
           Recent Activities ({recentActivities.length})
         </ThemedText>
-        
+
         {recentActivities.length > 0 ? (
           recentActivities.map((activity) => (
             <RecentActivityItem
