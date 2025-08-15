@@ -6,6 +6,11 @@ import { ApprovalListItem } from "./ApprovalListItem";
 import { Button } from "./Button";
 import { ThemedText } from "./ThemedText";
 
+// Helper function to check if a UUID is temporary
+const isTemporaryUuid = (uuid: string): boolean => {
+  return uuid.startsWith('temp_');
+};
+
 export function ChoreApprovalList() {
   const {
     pendingApprovalChores,
@@ -20,8 +25,10 @@ export function ChoreApprovalList() {
 
   // Load approval status from backend for minimal but accurate data
   const loadStatuses = async () => {
+    const validChores = pendingApprovalChores.filter(chore => !isTemporaryUuid(chore.uuid));
+    
     const entries = await Promise.all(
-      pendingApprovalChores.map(async (chore) => {
+      validChores.map(async (chore) => {
         try {
           const status = await getChoreApprovalStatus(chore.uuid);
           return [chore.uuid, status] as const;
@@ -64,7 +71,7 @@ export function ChoreApprovalList() {
   }
 
   const handleVoteToggle = async (choreId: string) => {
-    if (!currentUser) return;
+    if (!currentUser || isTemporaryUuid(choreId)) return;
 
     try {
       setVotingChoreId(choreId);
@@ -95,30 +102,37 @@ export function ChoreApprovalList() {
     <View style={styles.container}>
       <ThemedText type="subtitle">Vote on New Chores</ThemedText>
       {pendingApprovalChores.map((chore) => {
+        const isTemporary = isTemporaryUuid(chore.uuid);
         const approvalStatus = approvalStatuses[chore.uuid];
         const hasUserVoted = approvalStatus?.hasVoted?.[currentUser?.email || ""] === true;
         const votesText = approvalStatus
           ? `${approvalStatus.currentVotes}/${approvalStatus.totalEligibleVoters} votes`
           : "";
 
-
-
         return (
           <ApprovalListItem key={chore.uuid} chore={chore}>
             <View style={{ alignItems: "center" }}>
-              <ThemedText style={{ fontSize: 12, marginBottom: 4 }}>
-                {votesText}
-              </ThemedText>
-              <Button
-                title={hasUserVoted ? "Remove Vote" : "Vote"}
-                backgroundColor={
-                  hasUserVoted ? Colors.metro.orange : Colors.metro.green
-                }
-                loadingBackgroundColor={Colors.metro.teal}
-                isLoading={votingChoreId === chore.uuid}
-                onPress={() => handleVoteToggle(chore.uuid)}
-                size="small"
-              />
+              {isTemporary ? (
+                <ThemedText style={{ fontSize: 12, marginBottom: 4, opacity: 0.6 }}>
+                  Creating...
+                </ThemedText>
+              ) : (
+                <>
+                  <ThemedText style={{ fontSize: 12, marginBottom: 4 }}>
+                    {votesText}
+                  </ThemedText>
+                  <Button
+                    title={hasUserVoted ? "Remove Vote" : "Vote"}
+                    backgroundColor={
+                      hasUserVoted ? Colors.metro.orange : Colors.metro.green
+                    }
+                    loadingBackgroundColor={Colors.metro.teal}
+                    isLoading={votingChoreId === chore.uuid}
+                    onPress={() => handleVoteToggle(chore.uuid)}
+                    size="small"
+                  />
+                </>
+              )}
             </View>
           </ApprovalListItem>
         );

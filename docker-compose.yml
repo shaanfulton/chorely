@@ -14,6 +14,7 @@ services:
       - MUTE_API_LOGS=${MUTE_API_LOGS:-}
       - MUTE_ERROR_LOGS=${MUTE_ERROR_LOGS:-}
       - SHOW_API_PAYLOADS=${SHOW_API_PAYLOADS:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:?OPENAI_API_KEY must be set}
     deploy:
       resources:
         limits:

@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { ScrollView, StyleSheet, Alert, RefreshControl, Animated, Easing } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useLocalSearchParams } from "expo-router";
 
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -19,6 +20,8 @@ import { useGlobalChores } from "@/context/ChoreContext";
 export default function DisputeChoreScreen() {
   const insets = useSafeAreaInsets();
   const { currentHome } = useGlobalChores();
+  const { openDisputeId, navNonce } =
+    useLocalSearchParams<{ openDisputeId?: string; navNonce?: string }>();
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [recentActivities, setRecentActivities] = useState<Chore[]>([]);
   const [selectedActivity, setSelectedActivity] = useState<Chore | null>(null);
@@ -30,6 +33,8 @@ export default function DisputeChoreScreen() {
   const [disputeTargetPositions, setDisputeTargetPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
   const [activityAnimations, setActivityAnimations] = useState<Map<string, Animated.Value>>(new Map());
   const [pendingBounceActivityId, setPendingBounceActivityId] = useState<string | null>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+
 
   const loadData = useCallback(async () => {
     if (!currentHome?.id || loading) return;
@@ -130,6 +135,43 @@ export default function DisputeChoreScreen() {
     }
   }, [currentHome?.id]);
 
+  // Auto-expand dispute if openDisputeId is provided
+  useEffect(() => {
+    if (openDisputeId && disputes.length > 0) {
+      const disputeExists = disputes.some(d => d.uuid === openDisputeId);
+      if (disputeExists) {
+        // Always expand when openDisputeId is provided (from "Your Points" click)
+        setExpandedDisputeId(openDisputeId);
+        
+        setTimeout(() => {
+          if (scrollViewRef.current) {
+            const disputeIndex = disputes.findIndex(d => d.uuid === openDisputeId);
+            if (disputeIndex !== -1) {
+              const disputeCardHeight = 120;
+              const sectionTitleHeight = 50;
+              const padding = 20;
+              const targetY = sectionTitleHeight + padding + (disputeIndex * disputeCardHeight);
+              scrollViewRef.current.scrollTo({ y: Math.max(0, targetY - 100), animated: true });
+            }
+          }
+        }, 300);
+      }
+    }
+    // depend on navNonce so this runs even when the id is the same
+  }, [openDisputeId, navNonce, disputes]);
+
+
+  // Clear expanded dispute when no openDisputeId
+  useEffect(() => {
+    if (!openDisputeId) {
+      setExpandedDisputeId(null);
+    }
+  }, [openDisputeId]);
+
+
+
+
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadData();
@@ -192,8 +234,11 @@ export default function DisputeChoreScreen() {
   }, []);
 
   const handleDisputeExpanded = useCallback((disputeId: string) => {
-    setExpandedDisputeId(expandedDisputeId === disputeId ? null : disputeId);
+    const nextId = expandedDisputeId === disputeId ? null : disputeId;
+    setExpandedDisputeId(nextId);
   }, [expandedDisputeId]);
+
+
 
   const handleDisputeActivity = useCallback((activity: Chore) => {
     setSelectedActivity(activity);
@@ -210,6 +255,7 @@ export default function DisputeChoreScreen() {
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={{
           paddingBottom: insets.bottom + 80,
           padding: 20,
@@ -238,7 +284,7 @@ export default function DisputeChoreScreen() {
             })
             .map((dispute) => (
               <DisputeCard
-                key={dispute.uuid}
+                key={`${dispute.uuid}-${navNonce ?? 0}`}
                 dispute={dispute}
                 onDisputeResolved={handleDisputeResolved}
                 onDisputeExpanded={handleDisputeExpanded}

@@ -12,7 +12,7 @@ import {
 
 interface ChecklistProps {
   items: TodoItem[];
-  onItemPress: (item: TodoItem) => void;
+  onItemPress?: (item: TodoItem) => void;
   disabled?: boolean;
 }
 
@@ -27,24 +27,25 @@ export function Checklist({
     <View style={styles.container}>
       <ScrollView>
         {items.map((item, index) => (
-          <View key={index} style={styles.itemContainer}>
-            <TouchableOpacity
+          <TouchableOpacity
+            key={index}
+            style={styles.itemContainer}
+            onPress={disabled ? undefined : () => toggleItem(item.name)}
+            disabled={disabled}
+          >
+            <View
               style={[
                 styles.checkbox,
                 completedItems.has(item.name) && styles.checked,
                 disabled && styles.disabled,
               ]}
-              onPress={disabled ? undefined : () => toggleItem(item.name)}
-              disabled={disabled}
             >
               {completedItems.has(item.name) && (
                 <Text style={styles.checkmark}>✓</Text>
               )}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => onItemPress(item)}>
-              <Text style={styles.itemText}>{item.name}</Text>
-            </TouchableOpacity>
-          </View>
+            </View>
+            <Text style={styles.itemText}>{item.name}</Text>
+          </TouchableOpacity>
         ))}
       </ScrollView>
     </View>
@@ -87,5 +88,7 @@ const styles = StyleSheet.create({
   },
   itemText: {
     fontSize: 16,
+    flex: 1,
+    flexWrap: "wrap",
   },
 });

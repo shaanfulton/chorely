@@ -132,6 +132,24 @@ export default function LoginScreen() {
                 <Text style={styles.demoButtonText}>Bob</Text>
                 <Text style={styles.demoButtonSubtext}>bob@demo.com</Text>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.demoButton, styles.charlieButton]}
+                onPress={() => handleQuickLogin("charlie@demo.com")}
+                disabled={isLoading}
+              >
+                <Text style={styles.demoButtonText}>Charlie</Text>
+                <Text style={styles.demoButtonSubtext}>charlie@demo.com</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.demoButton, styles.dianaButton]}
+                onPress={() => handleQuickLogin("diana@demo.com")}
+                disabled={isLoading}
+              >
+                <Text style={styles.demoButtonText}>Diana</Text>
+                <Text style={styles.demoButtonSubtext}>diana@demo.com</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>

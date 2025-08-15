@@ -1,5 +1,5 @@
 import { useGlobalChores } from "@/context/ChoreContext";
-import { Chore } from "@/data/api";
+import { Chore, Dispute, getActiveDisputesAPI } from "@/data/api";
 import { getLucideIcon } from "@/utils/iconUtils";
 import { X } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
+import { Colors } from "@/constants/Colors";
+import { useRouter } from "expo-router";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE || "http://localhost:4000";
 
@@ -20,39 +22,94 @@ interface CompletedChoresModalProps {
   onClose: () => void;
 }
 
+// Combined interface for displaying both completed chores and disputed chores
+interface ChoreDisplayItem {
+  uuid: string;
+  name: string;
+  description: string;
+  icon: string;
+  points: number;
+  completed_at: string | null;
+  user_email: string | null;
+  isDisputed: boolean;
+  disputeReason?: string;
+  disputeId?: string; // Add dispute ID for navigation
+}
+
 export function CompletedChoresModal({
   visible,
   onClose,
 }: CompletedChoresModalProps) {
   const { currentUser, currentHome } = useGlobalChores();
-  const [completedChores, setCompletedChores] = useState<Chore[]>([]);
+  const [choreItems, setChoreItems] = useState<ChoreDisplayItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     if (visible && currentUser && currentHome) {
-      loadCompletedChores();
+      loadChoreItems();
     }
   }, [visible, currentUser, currentHome]);
 
-  const loadCompletedChores = async () => {
+  const loadChoreItems = async () => {
     if (!currentUser || !currentHome) return;
 
     setIsLoading(true);
     try {
-      // Use the activities endpoint to get recent completed chores
-      const response = await fetch(
-        `${API_BASE}/activities?homeId=${currentHome.id}&timeFrame=30d`
-      );
-      const allActivities = await response.json();
+      // Fetch both completed chores and active disputes
+      const [completedChoresResponse, disputesResponse] = await Promise.all([
+        fetch(`${API_BASE}/activities?homeId=${currentHome.id}&timeFrame=30d`),
+        getActiveDisputesAPI()
+      ]);
+
+      const allActivities = await completedChoresResponse.json();
 
       // Filter for chores completed by the current user
       const userCompletedChores = allActivities.filter(
         (chore: Chore) => chore.user_email === currentUser.email
       );
 
-      setCompletedChores(userCompletedChores);
+      // Get disputed chore IDs to filter out from completed chores
+      const disputedChoreIds = disputesResponse.map(dispute => dispute.choreId);
+
+      // Filter out completed chores that are being disputed
+      const nonDisputedCompletedChores = userCompletedChores.filter(
+        (chore: Chore) => !disputedChoreIds.includes(chore.uuid)
+      );
+
+      // Convert completed chores to display items
+      const completedItems: ChoreDisplayItem[] = nonDisputedCompletedChores.map((chore: Chore) => ({
+        uuid: chore.uuid,
+        name: chore.name,
+        description: chore.description,
+        icon: chore.icon,
+        points: chore.points,
+        completed_at: chore.completed_at,
+        user_email: chore.user_email,
+        isDisputed: false
+      }));
+
+      // Convert disputes to display items (only for chores claimed by current user)
+      const disputedItems: ChoreDisplayItem[] = disputesResponse
+        .filter(dispute => dispute.claimedByEmail === currentUser.email)
+        .map((dispute: Dispute) => ({
+          uuid: dispute.choreId,
+          name: dispute.choreName,
+          description: dispute.choreDescription,
+          icon: dispute.choreIcon,
+          points: dispute.chorePoints, // Use points from dispute data
+          completed_at: null, // Disputed chores are not considered completed
+          user_email: dispute.claimedByEmail,
+          isDisputed: true,
+          disputeReason: dispute.reason,
+          disputeId: dispute.uuid
+        }));
+
+      // Combine and sort by completion date (disputed items go at the end)
+      const allItems = [...completedItems, ...disputedItems];
+      setChoreItems(allItems);
     } catch (error) {
-      console.error("Failed to load completed chores:", error);
+      console.error("Failed to load chore items:", error);
     } finally {
       setIsLoading(false);
     }
@@ -85,7 +142,7 @@ export function CompletedChoresModal({
             numberOfLines={1}
             ellipsizeMode="tail"
           >
-            Completed
+            Your Points
           </ThemedText>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <X size={24} color="#666" />
@@ -95,20 +152,38 @@ export function CompletedChoresModal({
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {isLoading ? (
             <View style={styles.loadingContainer}>
-              <ThemedText>Loading completed chores...</ThemedText>
+              <ThemedText>Loading chore items...</ThemedText>
             </View>
-          ) : completedChores.length === 0 ? (
+          ) : choreItems.length === 0 ? (
             <View style={styles.emptyContainer}>
               <ThemedText style={styles.emptyText}>
-                No completed chores found for this week.
+                No completed or disputed chores found for this week.
               </ThemedText>
             </View>
           ) : (
-            completedChores.map((chore) => {
-              const IconComponent = getLucideIcon(chore.icon);
+            choreItems.map((item) => {
+              const IconComponent = getLucideIcon(item.icon);
+
+              const handleItemPress = () => {
+                if (item.isDisputed && item.disputeId) {
+                  // Navigate to dispute page with the specific dispute open
+                  onClose(); // Close the modal first
+                  router.push({
+                    pathname: "/(tabs)/dispute-chore",
+                    // add a unique bump each time to force the target effect to run
+                    params: { openDisputeId: item.disputeId, navNonce: Date.now().toString() }
+                  });
+                }
+              };
 
               return (
-                <View key={chore.uuid} style={styles.choreItem}>
+                <TouchableOpacity
+                  key={item.uuid}
+                  style={styles.choreItem}
+                  onPress={handleItemPress}
+                  disabled={!item.isDisputed}
+                  activeOpacity={item.isDisputed ? 0.7 : 1}
+                >
                   <View style={styles.choreHeader}>
                     <View style={styles.iconContainer}>
                       <IconComponent size={24} color="#666" />
@@ -118,23 +193,38 @@ export function CompletedChoresModal({
                         type="defaultSemiBold"
                         style={styles.choreName}
                       >
-                        {chore.name}
+                        {item.name}
                       </ThemedText>
                       <ThemedText style={styles.choreDescription}>
-                        {chore.description}
+                        {item.description}
                       </ThemedText>
-                      <ThemedText style={styles.completionInfo}>
-                        Completed on{" "}
-                        {formatCompletionDate(chore.completed_at || chore.time)}
-                      </ThemedText>
+                      {item.isDisputed ? (
+                        <ThemedText style={styles.disputeInfo}>
+                          Tap to view dispute
+                        </ThemedText>
+                      ) : (
+                        <ThemedText style={styles.completionInfo}>
+                          Completed on{" "}
+                          {formatCompletionDate(item.completed_at)}
+                        </ThemedText>
+                      )}
                     </View>
-                    <View style={styles.pointsContainer}>
-                      <ThemedText style={styles.pointsText}>
-                        +{chore.points}
-                      </ThemedText>
-                    </View>
+                    {!item.isDisputed && (
+                      <View style={styles.pointsContainer}>
+                        <ThemedText style={styles.pointsText}>
+                          +{item.points}
+                        </ThemedText>
+                      </View>
+                    )}
+                    {item.isDisputed && (
+                      <View style={[styles.pointsContainer, styles.disputedContainer]}>
+                        <ThemedText style={styles.disputedText}>
+                          ~{item.points}
+                        </ThemedText>
+                      </View>
+                    )}
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })
           )}
@@ -228,7 +318,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   pointsContainer: {
-    backgroundColor: "#4CAF50",
+    backgroundColor: "#4CAF50", // Green for completed chores
     borderRadius: 16,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -237,7 +327,20 @@ const styles = StyleSheet.create({
   },
   pointsText: {
     color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  disputeInfo: {
     fontSize: 12,
+    color: Colors.metro.orange, // Orange for disputed chores
+    marginTop: 4,
+  },
+  disputedContainer: {
+    backgroundColor: Colors.metro.orange, // Orange for disputed chores
+  },
+  disputedText: {
+    color: "#fff",
+    fontSize: 16,
     fontWeight: "600",
   },
 });

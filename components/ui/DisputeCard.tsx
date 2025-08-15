@@ -1,83 +1,84 @@
-import { Button } from "@/components/Button";
-import { Colors } from "@/constants/Colors";
+import { Dispute, DisputeVoteStatus, VoteType, voteOnDisputeAPI, removeDisputeVoteAPI, getDisputeVoteStatusAPI, getUserDisputeVoteAPI, getDisputeByIdAPI } from "@/data/api";
 import { useGlobalChores } from "@/context/ChoreContext";
-import {
-  Dispute,
-  DisputeVoteStatus,
-  VoteType,
-  getDisputeByIdAPI,
-  getDisputeVoteStatusAPI,
-  getUserDisputeVoteAPI,
-  removeDisputeVoteAPI,
-  voteOnDisputeAPI,
-} from "@/data/api";
 import { getLucideIcon } from "@/utils/iconUtils";
+import { Check, X, Clock, ChevronDown, ChevronUp } from "lucide-react-native";
+import React, { useEffect, useState, useRef } from "react";
+import { StyleSheet, TouchableOpacity, View, Alert, Animated, Easing } from "react-native";
 import { Image as ExpoImage } from "expo-image";
-import { Check, ChevronDown, ChevronUp, Clock, X } from "lucide-react-native";
-import React, { useEffect, useRef, useState } from "react";
-import {
-  Alert,
-  Animated,
-  Easing,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from "react-native";
 import { ThemedText } from "./ThemedText";
+import { ThemedView } from "./ThemedView";
 
 interface DisputeCardProps {
   dispute: Dispute;
-  onDisputeResolved: (
-    disputeId: string,
-    resolutionType: "approved" | "rejected"
-  ) => void;
+  onDisputeResolved: (disputeId: string, resolutionType: "approved" | "rejected") => void;
   onDisputeExpanded: (disputeId: string) => void;
   onDisputeVoted: (disputeId: string) => void;
   expanded: boolean;
-  targetPosition?: { x: number; y: number }; // Target position for rejected disputes
+  targetPosition?: { x: number; y: number };
 }
 
-export function DisputeCard({
-  dispute,
-  onDisputeResolved,
-  onDisputeExpanded,
-  onDisputeVoted,
-  expanded,
-  targetPosition,
-}: DisputeCardProps) {
+export function DisputeCard({ dispute, onDisputeResolved, onDisputeExpanded, onDisputeVoted, expanded, targetPosition }: DisputeCardProps) {
   const { currentUser } = useGlobalChores();
   const [voteStatus, setVoteStatus] = useState<DisputeVoteStatus | null>(null);
   const [userVote, setUserVote] = useState<VoteType | null>(null);
   const [isVoting, setIsVoting] = useState(false);
   const [canVote, setCanVote] = useState(() => {
-    // Initialize canVote based on whether current user is the one who claimed the chore
-    return currentUser?.email
-      ? dispute.claimedByEmail !== currentUser.email
-      : false;
+    return currentUser?.email ? dispute.claimedByEmail !== currentUser.email : false;
   });
   const [isResolved, setIsResolved] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const expandAnim = useRef(new Animated.Value(0)).current;
+  
+  const [showVoteFeedback, setShowVoteFeedback] = useState(false);
+  const [voteFeedbackMessage, setVoteFeedbackMessage] = useState("");
+  const [resolutionType, setResolutionType] = useState<"approved" | "rejected" | null>(null);
+  const [userVoteDisplay, setUserVoteDisplay] = useState<VoteType | null>(null);
 
   // Reset resolved state when dispute changes
   useEffect(() => {
     setIsResolved(false);
   }, [dispute.uuid]);
-  // Removed vote feedback toast state
-  const [userVoteDisplay, setUserVoteDisplay] = useState<VoteType | null>(null);
-  const fadeAnim = useRef(new Animated.Value(1)).current;
-  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  // Handle initial expansion state when component mounts
+  useEffect(() => {
+    if (expanded) {
+      expandAnim.setValue(1);
+    }
+  }, [expanded]); // Include expanded in dependencies
+
+  // Animate expansion/collapse
+  useEffect(() => {
+    if (expanded) {
+      Animated.spring(expandAnim, {
+        toValue: 1,
+        useNativeDriver: false,
+        tension: 100,
+        friction: 8,
+      }).start();
+    } else {
+      Animated.spring(expandAnim, {
+        toValue: 0,
+        useNativeDriver: false,
+        tension: 100,
+        friction: 8,
+      }).start();
+    }
+  }, [expanded, expandAnim]);
 
   // Fallback: when status API 404s, fetch dispute directly and animate/remove accordingly
   const resolveFromBackendRow = async () => {
     try {
       const row = await getDisputeByIdAPI(dispute.uuid);
       if (!row) {
-        // Stale card (likely after reseed) – remove without animation
         onDisputeResolved(dispute.uuid, "approved");
         return;
       }
       if (row.status === "approved" || row.status === "rejected") {
         const isApproved = row.status === "approved";
-        // Ensure it is collapsed while animating out
+        setResolutionType(isApproved ? "approved" : "rejected");
+        setVoteFeedbackMessage(`Dispute ${isApproved ? "approved" : "rejected"}!`);
+        setShowVoteFeedback(true);
         onDisputeExpanded(dispute.uuid);
         setIsResolved(true);
         Animated.timing(slideAnim, {
@@ -90,7 +91,6 @@ export function DisputeCard({
         });
       }
     } catch (e) {
-      // If even this fails, just drop the card to avoid a broken visual state
       onDisputeResolved(dispute.uuid, "approved");
     }
   };
@@ -99,40 +99,25 @@ export function DisputeCard({
   useEffect(() => {
     const loadVoteData = async () => {
       if (!dispute.uuid || !currentUser?.email) return;
-
+      
       try {
         const [status, vote] = await Promise.all([
           getDisputeVoteStatusAPI(dispute.uuid),
-          getUserDisputeVoteAPI(dispute.uuid, currentUser.email),
+          getUserDisputeVoteAPI(dispute.uuid, currentUser.email)
         ]);
         setVoteStatus(status);
         setUserVote(vote);
-        setUserVoteDisplay(vote); // Set the display vote
-
-        // Check if current user can vote (not the one who claimed the chore)
+        setUserVoteDisplay(vote);
+        
         const canUserVote = dispute.claimedByEmail !== currentUser.email;
         setCanVote(canUserVote);
-
-        // Reset resolved state if dispute is still pending
+        
         if (status && !status.is_approved && !status.is_rejected) {
           setIsResolved(false);
         }
       } catch (error) {
-        // If dispute status 404s, fetch final dispute row and animate accordingly
-        if (
-          error instanceof Error &&
-          error.message.includes("Dispute not found")
-        ) {
+        if (error instanceof Error && error.message.includes("Dispute not found")) {
           await resolveFromBackendRow();
-        } else if (
-          error instanceof Error &&
-          error.message.includes("Network request failed")
-        ) {
-          // Network error - don't clear the vote status, just continue
-          // Don't clear voteStatus, userVote, or userVoteDisplay on network errors
-          // The canVote state should already be set correctly from initialization
-        } else {
-          // Keep current UI instead of neutering the card
         }
       }
     };
@@ -143,193 +128,141 @@ export function DisputeCard({
   const handleVote = async (vote: VoteType) => {
     if (!currentUser?.email || isVoting) return;
 
-    const prevVote = userVote;
-    const prevStatus = voteStatus;
-
     try {
       setIsVoting(true);
+      const prevVote = userVote;
+      const prevStatus = voteStatus;
 
-      // Optimistic local counters so the UI reflects immediately
       const applyOptimistic = (from: VoteType | null, to: VoteType | null) => {
-        if (!prevStatus) return; // require known counts
+        if (!prevStatus) return;
         setVoteStatus((s) => {
           if (!s) return s;
           let approve = s.approve_votes;
           let reject = s.reject_votes;
           let total = s.total_votes;
-          // remove previous
-          if (from === "approve") {
-            approve = Math.max(0, approve - 1);
-            total = Math.max(0, total - 1);
-          }
-          if (from === "reject") {
-            reject = Math.max(0, reject - 1);
-            total = Math.max(0, total - 1);
-          }
-          // add new
-          if (to === "approve") {
-            approve += 1;
-            total += 1;
-          }
-          if (to === "reject") {
-            reject += 1;
-            total += 1;
-          }
-          return {
-            ...s,
-            approve_votes: approve,
-            reject_votes: reject,
-            total_votes: total,
-          };
+          if (from === "approve") { approve = Math.max(0, approve - 1); total = Math.max(0, total - 1); }
+          if (from === "reject")  { reject  = Math.max(0, reject  - 1); total = Math.max(0, total - 1); }
+          if (to === "approve")   { approve += 1; total += 1; }
+          if (to === "reject")    { reject  += 1; total += 1; }
+          return { ...s, approve_votes: approve, reject_votes: reject, total_votes: total };
         });
       };
-
+      
       if (userVote === vote) {
-        // Remove vote if clicking the same button
         applyOptimistic(prevVote, null);
         await removeDisputeVoteAPI(dispute.uuid, currentUser.email);
         setUserVote(null);
         setUserVoteDisplay(null);
-        // Unexpand the dispute when voting
+        setVoteFeedbackMessage("Vote removed");
+        setShowVoteFeedback(true);
         onDisputeExpanded(dispute.uuid);
-        // Notify parent that user voted
         onDisputeVoted(dispute.uuid);
       } else {
-        // Vote for a different option (either new vote or change vote)
         applyOptimistic(prevVote, vote);
         await voteOnDisputeAPI(dispute.uuid, currentUser.email, vote);
         setUserVote(vote);
         setUserVoteDisplay(vote);
-        // Unexpand the dispute when voting
+        setVoteFeedbackMessage(`Voted to ${vote} dispute`);
+        setShowVoteFeedback(true);
         onDisputeExpanded(dispute.uuid);
-        // Notify parent that user voted
         onDisputeVoted(dispute.uuid);
       }
 
-      // Always reload vote status to update counters
+      // Refresh vote status
       let newStatus: DisputeVoteStatus | null = null;
       try {
         newStatus = await getDisputeVoteStatusAPI(dispute.uuid);
         setVoteStatus(newStatus);
       } catch (error) {
-        // If dispute vanished here, resolve using final backend row
-        if (
-          error instanceof Error &&
-          error.message.includes("Dispute not found")
-        ) {
-          await resolveFromBackendRow();
-          return;
-        } else if (
-          error instanceof Error &&
-          error.message.includes("Network request failed")
-        ) {
-          // Network error - don't update status, just continue
-          return;
-        } else {
-          return;
-        }
-      }
-
-      // Check if dispute was resolved
-      if (newStatus && (newStatus.is_approved || newStatus.is_rejected)) {
-        const isApproved = newStatus.is_approved;
-        // Animate out immediately, no toast delay
-        setIsResolved(true);
-        if (isApproved) {
-          Animated.spring(slideAnim, {
-            toValue: -1,
-            useNativeDriver: true,
-            bounciness: 12,
-            speed: 9,
-          }).start(() => {
-            onDisputeResolved(dispute.uuid, "approved");
-          });
-        } else {
-          Animated.parallel([
-            Animated.timing(slideAnim, {
-              toValue: 2,
-              duration: 600,
-              useNativeDriver: true,
-              easing: Easing.out(Easing.cubic),
-            }),
-            Animated.timing(fadeAnim, {
-              toValue: 0,
-              duration: 250,
-              delay: 400,
-              useNativeDriver: true,
-            }),
-          ]).start(() => {
-            onDisputeResolved(dispute.uuid, "rejected");
-          });
-        }
+        await resolveFromBackendRow();
         return;
       }
-    } catch (error) {
-      // Roll back optimistic counts on error
-      if (voteStatus) {
-        setVoteStatus(prevStatus || null);
+
+      // Check if dispute is resolved
+      if (newStatus && (newStatus.is_approved || newStatus.is_rejected)) {
+        const isApproved = newStatus.is_approved;
+        setResolutionType(isApproved ? "approved" : "rejected");
+        setVoteFeedbackMessage(`Dispute ${isApproved ? 'approved' : 'rejected'}!`);
+        setShowVoteFeedback(true);
+        onDisputeExpanded(dispute.uuid);
+        setIsResolved(true);
+        Animated.timing(slideAnim, {
+          toValue: isApproved ? -1 : 2,
+          duration: 600,
+          useNativeDriver: true,
+          easing: Easing.linear,
+        }).start(() => {
+          onDisputeResolved(dispute.uuid, isApproved ? "approved" : "rejected");
+        });
       }
-      if (
-        error instanceof Error &&
-        error.message.includes("Network request failed")
-      ) {
-        Alert.alert(
-          "Network Error",
-          "Please check your connection and try again."
-        );
+    } catch (error) {
+      setVoteStatus(null);
+      if (error instanceof Error && error.message.includes("Network request failed")) {
+        Alert.alert("Network Error", "Please check your connection and try again.");
       } else {
         Alert.alert("Error", "Failed to vote on dispute. Please try again.");
       }
     } finally {
       setIsVoting(false);
-      // No feedback toast
+      setTimeout(() => {
+        setShowVoteFeedback(false);
+      }, 2000);
     }
+  };
+
+  const getUserName = (email: string) => {
+    return email.split('@')[0];
   };
 
   const IconComponent = getLucideIcon(dispute.choreIcon);
 
-  // Helper function to get user name from email
-  const getUserName = (email: string) => {
-    if (!email) return "Unknown User";
-    return email.split("@")[0];
-  };
-
   return (
-    <Animated.View
+    <Animated.View 
       style={[
-        styles.container,
-        {
+        styles.container, 
+        { 
           opacity: fadeAnim,
           backgroundColor: slideAnim.interpolate({
             inputRange: [-1, 0, 1],
-            outputRange: ["#E8F5E8", "#fff", "#FFEBEE"], // Green tint for approved, red tint for rejected
+            outputRange: ['#E8F5E8', '#fff', '#FFEBEE'],
           }),
           transform: [
             {
               translateX: slideAnim.interpolate({
                 inputRange: [-1, 0, 1, 2],
-                outputRange: [-400, 0, 0, 0], // Only slide left for approved, no horizontal movement for rejected
-              }),
+                outputRange: [-400, 0, 0, 0],
+              })
             },
             {
               translateY: slideAnim.interpolate({
                 inputRange: [-1, 0, 1, 2],
-                outputRange: [0, 0, 0, targetPosition?.y || 600], // Use target position or default
-              }),
-            },
-          ],
-        },
+                outputRange: [0, 0, 0, targetPosition?.y || 600],
+              })
+            }
+          ]
+        }
       ]}
     >
-      {/* Feedback toast removed */}
-
-      {/* Collapsed State - Always Visible */}
-      <TouchableOpacity
+      {showVoteFeedback && (
+        <View style={[
+          styles.feedbackToast, 
+          voteFeedbackMessage.includes('approved') || voteFeedbackMessage.includes('rejected') 
+            ? styles.resolutionToast 
+            : null
+        ]}>
+          <ThemedText style={styles.feedbackText}>{voteFeedbackMessage}</ThemedText>
+        </View>
+      )}
+      
+      <TouchableOpacity 
         style={styles.collapsedContent}
         onPress={() => onDisputeExpanded(dispute.uuid)}
         activeOpacity={0.7}
       >
         <View style={styles.collapsedHeader}>
+          <View style={styles.iconContainer}>
+            <IconComponent size={20} color="#666" />
+          </View>
           <View style={styles.collapsedInfo}>
             <ThemedText type="defaultSemiBold" style={styles.choreName}>
               {dispute.choreName}
@@ -338,147 +271,137 @@ export function DisputeCard({
               Completed by {getUserName(dispute.claimedByEmail)}
             </ThemedText>
           </View>
-          <View style={styles.collapsedFooterRow}>
-            <View style={styles.leftMetaRow}>
-              <View style={styles.iconContainer}>
-                <IconComponent size={20} color="#666" />
-              </View>
-              {dispute.claimedByEmail === currentUser?.email ? (
-                <View style={[styles.voteSignifier, styles.ownChoreSignifier]}>
-                  <ThemedText style={styles.voteSignifierText}>!</ThemedText>
-                </View>
-              ) : userVoteDisplay ? (
-                <View
-                  style={[
-                    styles.voteSignifier,
-                    userVoteDisplay === "approve"
-                      ? styles.approveSignifier
-                      : styles.rejectSignifier,
-                  ]}
-                >
-                  <ThemedText style={styles.voteSignifierText}>
-                    {userVoteDisplay === "approve" ? "✓" : "✗"}
-                  </ThemedText>
-                </View>
-              ) : null}
+          {dispute.imageUrl && (
+            <View style={styles.thumbnailContainer}>
+              <ExpoImage 
+                source={{ uri: dispute.imageUrl }} 
+                style={styles.thumbnail} 
+                contentFit="cover" 
+              />
             </View>
-            <TouchableOpacity
-              style={styles.expandButton}
-              onPress={() => onDisputeExpanded(dispute.uuid)}
-              activeOpacity={0.7}
-            >
-              {expanded ? (
-                <ChevronUp size={20} color="#666" />
-              ) : (
-                <ChevronDown size={20} color="#666" />
-              )}
-            </TouchableOpacity>
-          </View>
+          )}
+          
+          {dispute.claimedByEmail === currentUser?.email ? (
+            <View style={[styles.voteSignifier, styles.ownChoreSignifier]}>
+              <ThemedText style={styles.voteSignifierText}>!</ThemedText>
+            </View>
+          ) : userVoteDisplay ? (
+            <View style={[
+              styles.voteSignifier,
+              userVoteDisplay === "approve" ? styles.approveSignifier : styles.rejectSignifier
+            ]}>
+              <ThemedText style={styles.voteSignifierText}>
+                {userVoteDisplay === "approve" ? "✓" : "✗"}
+              </ThemedText>
+            </View>
+          ) : null}
+          
+          <TouchableOpacity 
+            style={styles.expandButton}
+            onPress={() => onDisputeExpanded(dispute.uuid)}
+            activeOpacity={0.7}
+          >
+            {expanded ? (
+              <ChevronUp size={20} color="#666" />
+            ) : (
+              <ChevronDown size={20} color="#666" />
+            )}
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
 
-      {/* Expanded State - Only visible when expanded */}
       {expanded && (
-        <View style={styles.expandedContent}>
-          {/* Dispute Details */}
+        <Animated.View 
+          style={[
+            styles.expandedContent,
+            {
+              opacity: expandAnim,
+            }
+          ]}
+        >
           <View style={styles.disputeDetails}>
-            <ThemedText style={styles.reason}>
-              Reason: {dispute.reason}
-            </ThemedText>
-            <ThemedText style={styles.descriptionSmall}>
+            <ThemedText style={styles.description}>
               {dispute.choreDescription}
+            </ThemedText>
+            <ThemedText style={styles.disputerName}>
+              Disputed by {getUserName(dispute.disputerEmail)}
+            </ThemedText>
+            <ThemedText style={styles.reason}>
+              "{dispute.reason}"
             </ThemedText>
           </View>
 
-          {/* Full Size Image */}
           {dispute.imageUrl && (
             <View style={styles.photoSection}>
-              <ExpoImage
-                source={{ uri: dispute.imageUrl }}
-                style={styles.photoImage}
-                contentFit="cover"
+              <ExpoImage 
+                source={{ uri: dispute.imageUrl }} 
+                style={styles.photoImage} 
+                contentFit="cover" 
               />
             </View>
           )}
 
-          {/* Vote Status Display */}
           {voteStatus && (
             <View style={styles.voteStatus}>
               <View style={styles.voteCounts}>
                 <View style={styles.voteCount}>
-                  <Check size={16} color={Colors.metro.green} />
+                  <Check size={16} color="#4CAF50" />
                   <ThemedText style={styles.voteCountText}>
-                    {voteStatus.approve_votes} approve
+                    {voteStatus.approve_votes} Approve
                   </ThemedText>
                 </View>
                 <View style={styles.voteCount}>
-                  <X size={16} color={Colors.metro.red} />
+                  <X size={16} color="#F44336" />
                   <ThemedText style={styles.voteCountText}>
-                    {voteStatus.reject_votes} reject
+                    {voteStatus.reject_votes} Reject
                   </ThemedText>
                 </View>
               </View>
               <ThemedText style={styles.voteInfo}>
-                {voteStatus.total_votes}/{voteStatus.total_eligible_voters}{" "}
-                votes • {voteStatus.required_votes} needed
+                {voteStatus.total_votes} total votes • {voteStatus.required_votes} needed to resolve
               </ThemedText>
-              {voteStatus.is_24_hours_passed && (
-                <View style={styles.timeoutWarning}>
-                  <Clock size={14} color="#FF9800" />
-                  <ThemedText style={styles.timeoutText}>
-                    Auto-rejected after 24 hours
-                  </ThemedText>
-                </View>
-              )}
             </View>
           )}
 
-          {/* Voting Buttons - Only show if user can vote and dispute is not resolved */}
-          {canVote && !isResolved ? (
-            <>
-              <ThemedText style={styles.actionHeader}>
-                Approve or reject this dispute
-              </ThemedText>
-              <View style={styles.actionButtons}>
-                {userVote == null ? (
-                  <>
-                    <Button
-                      title="Reject"
-                      backgroundColor={Colors.metro.red}
-                      disabled={isVoting}
-                      size="medium"
-                      style={{ flex: 1 }}
-                      onPress={() => handleVote("reject")}
-                    />
-                    <Button
-                      title="Approve"
-                      backgroundColor={Colors.metro.green}
-                      disabled={isVoting}
-                      size="medium"
-                      style={{ flex: 1 }}
-                      onPress={() => handleVote("approve")}
-                    />
-                  </>
-                ) : (
-                  <Button
-                    title="Remove Vote"
-                    backgroundColor={Colors.metro.gray}
-                    disabled={isVoting}
-                    size="medium"
-                    style={{ flex: 1 }}
-                    onPress={() => handleVote(userVote)}
-                  />
-                )}
-              </View>
-            </>
-          ) : !canVote ? (
+          {canVote && !isResolved && (
+            <View style={styles.actionButtons}>
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  styles.approveButton,
+                  userVote === "approve" && styles.selectedButton,
+                  isVoting && styles.disabledButton
+                ]}
+                onPress={() => handleVote("approve")}
+                disabled={isVoting}
+              >
+                <Check size={16} color="#fff" />
+                <ThemedText style={styles.buttonText}>Approve</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  styles.rejectButton,
+                  userVote === "reject" && styles.selectedButton,
+                  isVoting && styles.disabledButton
+                ]}
+                onPress={() => handleVote("reject")}
+                disabled={isVoting}
+              >
+                <X size={16} color="#fff" />
+                <ThemedText style={styles.buttonText}>Reject</ThemedText>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {!canVote && (
             <View style={styles.cannotVoteMessage}>
               <ThemedText style={styles.cannotVoteText}>
-                You cannot vote on a dispute for a chore you completed
+                You cannot vote on your own disputed chore
               </ThemedText>
             </View>
-          ) : null}
-        </View>
+          )}
+        </Animated.View>
       )}
     </Animated.View>
   );
@@ -488,34 +411,24 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: "#f8f9fa",
     borderRadius: 12,
-    // Stretch to parent width; parent controls its padding/margins
-    alignSelf: "stretch",
-    marginHorizontal: 0,
+    marginHorizontal: 20,
     marginVertical: 8,
-    // Remove drop shadow per request
-    shadowColor: "transparent",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
     overflow: "hidden",
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: "#e9ecef",
   },
   collapsedContent: {
     padding: 16,
   },
   collapsedHeader: {
-    flexDirection: "column",
-    alignItems: "stretch",
-  },
-  collapsedFooterRow: {
-    marginTop: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  leftMetaRow: {
     flexDirection: "row",
     alignItems: "center",
   },
@@ -621,32 +534,48 @@ const styles = StyleSheet.create({
     fontSize: 11,
     opacity: 0.7,
     textAlign: "center",
-    marginBottom: 4,
-  },
-  timeoutWarning: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-  },
-  timeoutText: {
-    fontSize: 11,
-    color: "#FF9800",
-    fontWeight: "600",
   },
   actionButtons: {
     flexDirection: "row",
     gap: 8,
   },
-  actionHeader: {
-    fontSize: 12,
-    opacity: 0.7,
-    marginBottom: 8,
-  },
   actionButton: {
     flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    gap: 4,
   },
-  // Remove custom button styling; using shared Button component
+  rejectButton: {
+    backgroundColor: "#2196F3",
+  },
+  approveButton: {
+    backgroundColor: "#F44336",
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  selectedButton: {
+    opacity: 1,
+    borderWidth: 3,
+    borderColor: "#fff",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  disabledButton: {
+    opacity: 0.4,
+  },
   cannotVoteMessage: {
     padding: 12,
     backgroundColor: "#f8f9fa",
@@ -659,7 +588,26 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontStyle: "italic",
   },
-  // feedback toast styles removed
+  feedbackToast: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    zIndex: 1000,
+  },
+  resolutionToast: {
+    backgroundColor: "#2196F3",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  feedbackText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+  },
   voteSignifier: {
     width: 24,
     height: 24,
@@ -669,10 +617,10 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   approveSignifier: {
-    backgroundColor: Colors.metro.green,
+    backgroundColor: "#F44336",
   },
   rejectSignifier: {
-    backgroundColor: Colors.metro.red,
+    backgroundColor: "#2196F3",
   },
   ownChoreSignifier: {
     backgroundColor: "#FF9800",
@@ -683,3 +631,4 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 });
+
